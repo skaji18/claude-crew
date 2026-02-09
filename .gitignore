@@ -15,5 +15,9 @@ __pycache__/
 .vscode/
 .idea/
 
+# Memory (persistent knowledge store, not tracked)
+memory/
+.mcp.json
+
 # Claude Code local settings (user-specific overrides)
 .claude/settings.local.json

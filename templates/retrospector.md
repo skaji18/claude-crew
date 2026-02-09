@@ -25,10 +25,10 @@ The parent provides:
 Search for previously recorded failure and success patterns to inform your analysis.
 
 ```
-mcp__memory__search_nodes(query="claude-crew:failure_pattern")
-mcp__memory__search_nodes(query="claude-crew:success_pattern")
-mcp__memory__search_nodes(query="claude-crew:lesson_learned")
-mcp__memory__search_nodes(query="claude-crew:best_practice")
+mcp__memory__search_nodes(query="failure_pattern")
+mcp__memory__search_nodes(query="best_practice")
+mcp__memory__search_nodes(query="lesson_learned")
+mcp__memory__search_nodes(query="tech_decision")
 ```
 
 Note any patterns found — they will be used for:
@@ -219,20 +219,64 @@ Write the output to `RETROSPECTIVE_PATH` following the Output Format defined bel
 
 #### Memory MCP追加候補
 
-From the analysis, extract patterns worth persisting in Memory MCP. List them at the end of retrospective.md.
+From the analysis, extract **domain knowledge and reusable principles** worth persisting in Memory MCP.
 
-Entity naming convention:
+##### 即却下フィルタ（候補生成前に必ず確認）
+
+以下に1つでも該当する候補は生成するな:
+
+1. **cmd_NNN参照**: 特定のcmd IDへの言及がある（例: "cmd_030で確立した"）。パターンとして昇華してからのみ記録可
+2. **内部アーキテクチャ記述**: decomposer, aggregator, parent session, Phase 1/2/3/4, execution_log 等のclaude-crew内部処理の記述。内部処理はテンプレート改善（IMP-NNN）で対処せよ
+3. **Claudeの事前学習知識**: OWASP, NIST, CVE等の公知情報で、プロジェクト固有の文脈や検証結果がないもの
+4. **環境設定の重複**: CLAUDE.md, config.yaml, .claude/settings.json に既に記載されている情報
+5. **未昇華の失敗/成功**: 教訓や判断基準に変換されていない事実記録（例: "Task 3が失敗した", "cmd_025でうまくいった"）
+6. **過度な抽象化**: 具体的な行動指針に落とせない一般論（例: "品質を高めよう", "タスク分解は重要"）
+
+##### 必須条件（全て満たす候補のみ生成）
+
+- [ ] **Cross-cmd適用可能性**: 3つ以上の将来のcmdに異なるドメインで適用可能
+- [ ] **行動変容可能性**: この知見を読んだサブエージェントが具体的に行動を変える
+- [ ] **観測の具体性**: 条件と効果が定量的または具体的に記述されている
+
+##### 命名規約
+
 ```
-claude-crew:{type}:{identifier}
+Format: "{domain}:{category}:{identifier}"
 
-Failure pattern examples:
-claude-crew:failure_pattern:result_file_missing
-claude-crew:lesson_learned:haiku_complex_task_failure
+Good:
+  security:env_file_exposure_risk
+  user:shogun:preference:avoid_excessive_abstraction
+  multi_agent:decomposition:foundation_first_pattern
 
-Success pattern examples:
-claude-crew:success_pattern:parallel_comparison_workflow
-claude-crew:best_practice:task_granularity_limit
-claude-crew:skill_candidate:tech_comparison_analysis
+Bad (reject):
+  claude-crew:failure_pattern:result_file_missing  -- 内部アーキテクチャ
+  cmd_030:security:env_protection                  -- cmd固有スコープ
+```
+
+##### Observation品質基準
+
+各observationは以下の構造で100-500文字以内に記述せよ:
+
+```
+[What]: パターンの記述
+[Evidence]: 定量データまたはcmd横断の根拠
+[Scope]: 適用条件
+[Caveat]: 適用しない条件（省略可）
+```
+
+##### Before/After例
+
+**Bad candidate (reject)**:
+```
+name: "claude-crew:success_pattern:optimal_wave_parallelization"
+observation: "cmd_030で3-wave DAG構造がうまくいった。Wave 1に3タスク並列で301秒。"
+```
+→ cmd固有 + 内部アーキテクチャ + 未昇華の成功事例
+
+**Good candidate (accept)**:
+```
+name: "multi_agent:decomposition:foundation_first_pattern"
+observation: "[What] 多面的調査は基盤タスク1個→並列N個の2層構造が有効。[Evidence] 4回の調査cmdで再現。基盤なし全並列比で一貫性20%向上。[Scope] 3個以上の調査観点があるリサーチタスク。[Caveat] 完全に独立した調査には不要。"
 ```
 
 **Important**: The retrospector only *recommends* Memory MCP entries. The parent session presents them to the human for approval. Do NOT call mcp__memory__create_entities directly.
@@ -272,20 +316,41 @@ proposal:
 
 ### Skill Proposal (type: skill_candidate)
 
+**重要**: `category: template_enhancement` や `guide_update` は Skill ではなく **Improvement Proposal (IMP-NNN)** として提案せよ。Skill (SKL-NNN) は `category: new_skill` のみ。
+
+**Skill化の前提条件（全5条件を満たす場合のみSKL-NNNとして提案）**:
+1. `/skill-name [args]` でユーザーが直接起動できる自己完結型ワークフローである
+2. claude-crew以外の3つ以上のプロジェクトで使える
+3. 月3回以上呼び出される想定がある
+4. 3ステップ以上の定型手順がある
+5. 生成元システム（claude-crew）外部に価値を提供する
+
+上記を満たさない成功パターンは: テンプレート改善なら IMP-NNN、知見なら Memory MCP候補として提案せよ。
+
 ```yaml
 proposal:
   id: SKL-001
   type: skill_candidate
   title: "Short descriptive title"
-  category: new_skill          # new_skill / template_enhancement / guide_update
-  source_cmd: cmd_xxx
+  category: new_skill
+  invocation: "/skill-name [args]"    # ユーザーが入力するコマンド例
   success_pattern: |
-    What succeeded (factual description).
+    What succeeded (factual description, no cmd_NNN references).
   what_worked: |
     Why it succeeded (analysis based on the 5 perspectives).
   proposed_skill: |
     What to create as a skill and how it works.
+    Must include: Input → Steps → Output の明記.
+  cross_project_examples: |
+    - Project A: [how it would be used]
+    - Project B: [how it would be used]
+    - Project C: [how it would be used]
   reuse_potential: "Description of reuse scenarios"
+  skill_scores:
+    formalizability: 4     # 定型手順化可能性 (1-5)
+    automation: 4           # 人間判断排除可能性 (1-5)
+    frequency: 3            # 再利用頻度 (1-5)
+    skill_total: 11         # 合計 (12+: 推奨, 9-11: 条件付き, <9: 不可)
   filter_scores:
     recurrence: 3
     impact: 4
@@ -336,12 +401,14 @@ proposals_rejected: 2         # Number of discarded proposals
 
 ### SKL-001: [Title]
 - **Category**: new_skill
-- **Source cmd**: cmd_xxx
+- **Invocation**: `/skill-name [args]`
 - **Success pattern**: [What succeeded]
 - **What worked**: [Why it succeeded]
-- **Proposed skill**: [What to create]
+- **Proposed skill**: [Input → Steps → Output]
+- **Cross-project examples**: [3+ projects where this skill applies]
 - **Reuse potential**: [Where else it can be used]
-- **Score**: Recurrence X / Impact X / Generality X / Feasibility X = **Total X.X**
+- **Skill scores**: Formalizability X / Automation X / Frequency X = **Total X** (12+: recommended)
+- **Filter scores**: Recurrence X / Impact X / Generality X / Feasibility X = **Total X.X**
 
 ## Held Proposals
 - IMP-002: [1-line summary] (Score: X.X)
@@ -351,12 +418,9 @@ proposals_rejected: 2         # Number of discarded proposals
 - [Pattern]: Observed N times across M commands. [Preventive suggestion if applicable]
 
 ## Memory MCP追加候補
-- name: "claude-crew:failure_pattern:identifier"
-  type: failure_pattern
-  observation: "Specific observation to persist"
-- name: "claude-crew:success_pattern:identifier"
-  type: success_pattern
-  observation: "Specific observation to persist"
+- name: "{domain}:{category}:{identifier}"
+  type: best_practice / failure_pattern / tech_decision / lesson_learned
+  observation: "[What] パターン記述 [Evidence] 根拠 [Scope] 適用条件"
 ```
 
 **When there are no proposals** (all candidates were filtered out or no patterns detected):

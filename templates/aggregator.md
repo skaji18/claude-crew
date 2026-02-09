@@ -117,8 +117,40 @@ failed_tasks: []         # list of failed task IDs (required)
 > **Quality Alert**: CRITICAL issues detected. Human review recommended.
 
 ## Memory MCP追加候補（統合）
-以下はworkerから提案された知見候補。親セッションで人間に確認を求めること。
-[候補がある場合はworker別にグループ化して記載。ない場合は「Memory MCP追加候補: なし」]
+
+### 統合手順
+
+workerから提案された候補に対し、以下の3ステップで統合・フィルタリングを行え:
+
+**Step 1: 即却下フィルタ**
+以下に該当する候補は除外せよ:
+- `cmd_\d+` パターン（特定cmd参照）を含む候補
+- claude-crew内部処理の記述（キーワード: decomposer, aggregator, parent session, Phase, execution_log, plan.md, result_N.md）
+- Claudeの事前学習で既知の一般知識（OWASP, NIST, CVE等でプロジェクト固有文脈がないもの）
+- 環境設定・ツール使用法・完了タスク詳細の転記
+
+**Step 2: 重複統合**
+複数workerから同一・類似の候補が出た場合、最も具体的で根拠の強い1件に統合せよ。統合時は:
+- 最も定量的な証拠を持つ候補を基本とする
+- 補完的な情報があれば observation に追記する
+- 統合元のworker IDを注記する（例: "統合元: Task 2, Task 4"）
+
+**Step 3: 品質チェック**
+残った候補が以下を満たすか確認せよ:
+- [ ] Cross-cmd適用可能性: 3つ以上の将来cmdに適用可能
+- [ ] 行動変容可能性: サブエージェントが行動を変えられる
+- [ ] 観測の具体性: 条件と効果が具体的
+
+フィルタ通過数と除外数を以下の形式で報告せよ:
+```
+候補総数: N件（worker提案合計）
+除外: M件（即却下: A件, 重複統合: B件, 品質不足: C件）
+採用候補: K件
+```
+
+[採用候補がある場合はドメイン別にグループ化して記載。ない場合は「Memory MCP追加候補: なし」]
+
+親セッションで人間に確認を求めること。
 ```
 
 ## Rules

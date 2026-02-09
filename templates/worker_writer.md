@@ -68,12 +68,24 @@ task_id: N               # task number (required)
 [Any observations, caveats, or follow-up suggestions]
 ```
 
-タスク実行中にMemory MCPに追加すべき知見を発見した場合、resultファイル末尾に以下の形式で記載せよ（該当なしの場合は省略可）:
+タスク実行中に**将来の別タスクで再利用可能な**知見を発見した場合のみ、resultファイル末尾に以下の形式で記載せよ（該当なしの場合は省略可。出さないことは正常な結果である）:
+
+**候補にしてよいもの**:
+- プロジェクト固有の慣習・制約で、外部ドキュメントにない情報（例: "このユーザーはXXXを好む"）
+- 複数タスクで再現された具体的なパターン（例: "YYYの場合はZZZが有効"）
+- 失敗から導出された具体的な判断基準（例: "条件AならBを避け、Cを選べ"）
+
+**候補にしてはいけないもの**:
+- 特定cmdへの言及（cmd_NNN）
+- claude-crewの内部処理の記述（decomposer, aggregator, Phase等）
+- Claudeの事前学習で既知の一般知識
+- 行動に落とせない抽象論
+- 今回のタスクの実行結果メトリクス
 
     ## Memory MCP追加候補
-    - name: "scope:category:identifier"
+    - name: "{domain}:{category}:{identifier}"
       type: best_practice / failure_pattern / tech_decision / lesson_learned
-      observation: "具体的な知見の内容"
+      observation: "[What] パターン記述 [Evidence] 根拠 [Scope] 適用条件"
 
 ## Rules
 

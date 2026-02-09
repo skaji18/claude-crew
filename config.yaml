@@ -30,3 +30,6 @@ retrospect:
     max_skills: 1                # Max skill proposals (from success patterns)
   light_mode:
     max_skills: 2                # Max skill proposals (light mode, success only)
+  memory:
+    max_candidates_per_cmd: 5    # Max Memory MCP candidates per cmd (aggregator enforces)
+    skill_min_score: 12          # Minimum 3-axis score for skill proposals (max=15)

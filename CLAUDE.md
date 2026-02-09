@@ -441,6 +441,43 @@ TEMPLATE_PATH: templates/xxx.md
 - **メモリが空でも正常動作する**。メモリは補助情報であり、見つからなければそのまま作業を進めてよい
 - メモリの**検索**はサブエージェント側で行う。メモリへの**書き込み**は、Phase 3/4 で人間が承認した候補に限り、親セッションがサブエージェントに委譲して実行する
 
+### Memory MCP候補の品質基準
+
+Memory MCPに記録する知見は以下の基準を満たすこと:
+
+**即却下（以下に該当する候補は生成・承認しない）**:
+- 特定cmd参照（`cmd_NNN`）を含む候補
+- claude-crew内部アーキテクチャの記述（decomposer, aggregator, parent session, Phase, execution_log等）
+- Claudeの事前学習で既知の一般知識（プロジェクト固有文脈がないOWASP/NIST/CVE等）
+- 環境設定の重複（CLAUDE.md / config.yaml に既存の情報）
+- 未昇華の事実記録（教訓・判断基準への変換が必要）
+- 行動に落とせない抽象論
+
+**必須条件（全て満たすこと）**:
+- Cross-cmd適用可能性: 3つ以上の将来cmdで異なるドメインに適用可能
+- 行動変容可能性: 読んだサブエージェントが具体的に行動を変えられる
+- 観測の具体性: 条件と効果が定量的または具体的
+
+**命名規約**: `{domain}:{category}:{identifier}`
+- Good: `security:env_file_exposure_risk`, `user:shogun:preference:report_brevity`
+- Bad: `claude-crew:failure_pattern:result_file_missing` (内部アーキテクチャ)
+
+**1cmdあたりの候補上限**: `config.yaml: retrospect.memory.max_candidates_per_cmd`（デフォルト: 5件）
+
+### Claude Skills提案の品質基準
+
+Skills提案は以下の5条件を全て満たす場合のみ提案する:
+
+1. `/skill-name [args]` でユーザーが直接起動できる自己完結型ワークフローである
+2. claude-crew以外の3つ以上のプロジェクトで使える
+3. 月3回以上呼び出される想定がある
+4. 3ステップ以上の定型手順がある
+5. 生成元システム（claude-crew）外部に価値を提供する
+
+上記を満たさない成功パターンは、テンプレート改善（IMP-NNN）またはMemory MCP候補として提案する。
+
+**3軸スコアリング閾値**: `config.yaml: retrospect.memory.skill_min_score`（デフォルト: 12点/15点満点）
+
 ## コンテキスト管理
 
 - **1依頼1サイクルがコンパクションなしで完走できること**が目標
