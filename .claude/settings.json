@@ -18,7 +18,8 @@
       "Bash(wc *)",
       "Bash(tail *)",
       "Bash(grep *)",
-      "Bash(./scripts/*)"
+      "Bash(./scripts/*)",
+      "Bash(./skills/*/scripts/*)"
     ],
     "deny": [
       "Bash(rm -rf *)",
