@@ -1,0 +1,19 @@
+# Work directories (runtime output, not tracked)
+work/*
+!work/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Editor / OS
+.DS_Store
+*.swp
+*~
+.vscode/
+.idea/
+
+# Claude Code local settings (user-specific overrides)
+.claude/settings.local.json

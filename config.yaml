@@ -1,0 +1,32 @@
+# claude-crew configuration
+
+# Framework version
+version: "0.7.2"
+
+# Default model for sub-agents (used when decomposer does not specify)
+default_model: sonnet    # haiku / sonnet / opus
+
+# Maximum number of parallel sub-agents
+max_parallel: 10
+
+# Maximum retry count when result files are missing
+max_retries: 2
+
+# Minimum tasks to enable background execution
+background_threshold: 5
+
+# Maximum turns (API round-trips) per sub-agent (maps to Task tool max_turns)
+# Note: Task tool has no time-based timeout; turn count is the only control
+worker_max_turns: 30
+
+# Retrospect mechanism (Phase 4)
+# Post-mortem & success analysis after cmd completion
+retrospect:
+  enabled: true                  # false to skip Phase 4 entirely
+  filter_threshold: 3.5          # Minimum total score for proposal adoption
+  model: sonnet                  # Model for retrospector (sonnet recommended for analysis)
+  full_mode:
+    max_improvements: 2          # Max improvement proposals (from failure patterns)
+    max_skills: 1                # Max skill proposals (from success patterns)
+  light_mode:
+    max_skills: 2                # Max skill proposals (light mode, success only)
