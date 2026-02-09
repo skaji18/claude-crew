@@ -7,7 +7,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
 for i in $(seq 1 5); do
-  LAST=$(ls work/ 2>/dev/null | grep -oP '^cmd_\K\d+' | sort -n | tail -1)
+  LAST=$(ls work/ 2>/dev/null | sed -n 's/^cmd_\([0-9]*\)$/\1/p' | sort -n | tail -1)
   NEXT=$(printf "%03d" $(( 10#${LAST:-0} + 1 )))
   if mkdir "work/cmd_${NEXT}" 2>/dev/null; then
     mkdir -p "work/cmd_${NEXT}/tasks" "work/cmd_${NEXT}/results"
