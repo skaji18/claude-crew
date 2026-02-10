@@ -422,15 +422,23 @@ TEMPLATE_PATH: templates/xxx.md
 - deny リストの操作は自動拒否される（バイパス不可）
 
 ### 操作別ポリシー
+
+3段階制御: deny（自動拒否）> ask（毎回確認）> allow（自動許可）
+
 | 操作カテゴリ | ポリシー |
 |-------------|---------|
-| 読み取り（git status/diff/log/branch, ls, pwd, Read, Glob, Grep） | 自動許可（allow リスト） |
-| Bash ユーティリティ（date, wc, tail, grep, mkdir, bash scripts/*） | 自動許可（allow リスト） |
-| Git 書き込み（git add, git commit） | 自動許可（allow リスト） |
+| Git 全般（status, diff, log, add, commit 等） | 自動許可（allow: `git *`） |
+| GitHub CLI | 自動許可（allow: `gh *`） |
+| Bash ユーティリティ（ls, pwd, mkdir, date, wc, tail, head, grep, cat, sort, which, touch） | 自動許可（allow リスト） |
+| スクリプト実行（./scripts/*, skills scripts） | 自動許可（allow リスト） |
+| ファイル操作ツール（Read, Glob, Grep） | 自動許可（allow リスト） |
 | ファイル書き込み（Edit, Write） | 初回確認、以降セッション中許可 |
-| 外部通信（git push） | 毎回確認 |
-| 外部通信（curl POST/PUT/DELETE/PATCH） | 自動拒否（deny リスト） |
-| 危険操作（force push, rm -rf, DROP TABLE 等） | 自動拒否（deny リスト。詳細は `.claude/settings.json` 参照） |
+| Git push（force push含む） | 毎回確認（ask: `git*push*`） |
+| Git 破壊操作（reset --hard, clean -f, checkout ., restore .） | 毎回確認（ask リスト） |
+| HTTP 変更（curl POST/PUT/PATCH） | 毎回確認（ask リスト） |
+| ファイル再帰削除（rm -rf, rm -r） | 自動拒否（deny リスト） |
+| HTTP DELETE（curl -X DELETE） | 自動拒否（deny リスト） |
+| 危険操作（pipe to sh/bash, chmod 777, DROP TABLE 等） | 自動拒否（deny リスト。詳細は `.claude/settings.json` 参照） |
 
 ## Memory MCP活用
 

@@ -6,6 +6,20 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.4] - 2026-02-10
+
+### Changed
+- **Permission system: 3-tier control** — introduced `ask` tier in `.claude/settings.json` for deny > ask > allow evaluation order
+  - `git *` in allow — single pattern covers all git subcommands including `-C`, `--no-pager` flag combinations
+  - `git*push*` in ask — git push (including force push) requires user confirmation instead of hard deny
+  - Git destructive ops (`reset --hard`, `clean -f`, `checkout .`, `restore .`) moved from deny to ask — recoverable via reflog, user decides
+  - `curl POST/PUT/PATCH` moved from deny to ask — enables API testing with user confirmation
+  - `curl DELETE` remains in deny — irreversible external data loss
+  - `* | sh`, `* | bash` generalized from curl/wget-specific patterns — covers all pipe-to-shell regardless of download tool
+  - Removed redundant patterns (`git add *`, `git commit *` covered by `git *`)
+  - Removed false-positive-prone `*git*` prefix in deny, changed to `git*` prefix (prevents `grep "git push" log` from being blocked)
+- **CLAUDE.md permission policy table** — updated to reflect 3-tier control with ask tier documentation
+
 ## [0.7.3] - 2026-02-10
 
 ### Added
