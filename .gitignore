@@ -1,6 +1,7 @@
 # Work directories (runtime output, not tracked)
 work/*
 !work/.gitkeep
+refine_output/
 
 # Python
 __pycache__/
