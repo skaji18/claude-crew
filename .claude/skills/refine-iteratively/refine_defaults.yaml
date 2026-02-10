@@ -1,0 +1,95 @@
+# Default configuration for /refine-iteratively Claude Skill
+# This file defines standard parameters for iterative refinement workflows
+# Users can override these via --config=custom.yaml argument
+
+# Maximum number of refinement rounds (execution cycles)
+# Set to 4 per design specification for balanced quality-vs-time tradeoff
+max_rounds: 4
+
+# Validation thresholds that must be met for a round to be considered successful
+validation:
+  # Minimum quality level required: RED < YELLOW < GREEN
+  # DEFAULT: GREEN (high quality standard; more lenient configs can override to YELLOW)
+  quality_threshold: GREEN
+
+  # Minimum completeness percentage required (0-100)
+  # DEFAULT: 90 (high completeness standard; allows iterative improvement while maintaining quality)
+  completeness_threshold: 90
+
+  # Structural quality checks (apply to all result files)
+  # Minimum line count to prevent trivial/stub outputs
+  min_lines: 20
+
+  # Task-specific required sections (validated if present in task metadata)
+  # Maps task type to required section headers
+  required_sections:
+    code:
+      - "```"  # Code block marker (backticks)
+    research:
+      - "## Sources"  # Research must cite sources
+    review:
+      - "## Findings"  # Review must document findings
+    documentation:
+      - "## Summary"  # Docs need overview
+      - "## Details"  # Docs need specifics
+
+  # Timeout per round in seconds (prevents runaway rounds)
+  # 300 seconds = 5 minutes (reasonable for most tasks)
+  timeout_per_round: 300
+
+# Output file naming and structure
+output:
+  # Template for round output directory naming
+  # {timestamp} = ISO datetime, {round} = round number
+  round_dir_pattern: "refine_{timestamp}"
+
+  # Metadata file name for each round (relative to round directory)
+  metadata_file: "execution_log.yaml"
+
+  # Final consolidated report filename
+  final_report: "refinement_report.md"
+
+  # Per-round result file pattern
+  result_file_pattern: "result_{round}.md"
+
+  # Per-round feedback file pattern (for failed rounds)
+  feedback_file_pattern: "feedback_{round}.md"
+
+# Critique and feedback generation parameters
+critique:
+  # Minimum number of issues/gaps that must be identified before proceeding to next round
+  # Set to 1 to ensure feedback is always generated (even for minor issues)
+  min_issues: 1
+
+  # Focus areas for review (guides feedback generation)
+  # Applicable to all task types, but emphasis varies by domain
+  focus_areas:
+    - "design"           # Architecture, structure, approach
+    - "implementation"   # Correctness, completeness, efficiency
+    - "testing"          # Coverage, edge cases, validation
+    - "documentation"    # Clarity, examples, completeness
+    - "quality"          # Style, best practices, maintainability
+
+# Logging and observability
+logging:
+  # Enable detailed round-by-round logging
+  detailed_logs: true
+
+  # Include timing metrics per round
+  track_duration: true
+
+  # Include token usage estimates (if available)
+  track_cost: false
+
+# Advanced options for power users
+advanced:
+  # Allow user to specify custom validation logic via Python script
+  # Path is relative to skill installation directory
+  custom_validator: null
+
+  # Allow parallel round execution (future enhancement)
+  # For now, must be false (sequential rounds only)
+  parallel_rounds: false
+
+  # Enable manual review mode (pause between rounds for human input)
+  manual_feedback: false

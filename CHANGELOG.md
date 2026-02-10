@@ -9,14 +9,14 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ## [0.7.3] - 2026-02-10
 
 ### Added
-- **`/refine-iteratively` Claude Skill** (`skills/refine-iteratively/`) — user-invocable iterative quality refinement workflow; executes any task through multiple rounds of validation and improvement until acceptance criteria are met
+- **`/refine-iteratively` Claude Skill** (`.claude/skills/refine-iteratively/`) — user-invocable iterative quality refinement workflow; executes any task through multiple rounds of validation and improvement until acceptance criteria are met
   - `SKILL.md` — skill definition (invocation, arguments, workflow, validation rules, examples)
   - `refine_defaults.yaml` — default configuration (thresholds, validation rules, round settings)
   - `scripts/extract_metadata.py` — YAML frontmatter extraction from result files
   - `scripts/validate_round.py` — round quality/completeness threshold validation
   - `scripts/generate_feedback.py` — structured improvement feedback generation
   - `scripts/consolidate_report.py` — multi-round final report consolidation
-- **Skill scripts permission** in `.claude/settings.json` — added `Bash(./skills/*/scripts/*)` to allow list
+- **Skill scripts permission** in `.claude/settings.json` — added `Bash(python3 .claude/skills/*/scripts/*)` to allow list
 
 ## [0.7.2] - 2026-02-08
 

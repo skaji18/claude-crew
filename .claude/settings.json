@@ -19,7 +19,7 @@
       "Bash(tail *)",
       "Bash(grep *)",
       "Bash(./scripts/*)",
-      "Bash(./skills/*/scripts/*)"
+      "Bash(python3 .claude/skills/*/scripts/*)"
     ],
     "deny": [
       "Bash(rm -rf *)",
