@@ -327,20 +327,31 @@ tasks:
 
 | サブタスク数 | 依存関係 | Phase 1（分解） | Phase 3（集約） |
 |:----------:|:-------:|:--------------:|:--------------:|
-| 1つ | なし | 省略可 | 省略可 |
-| 2つ | なし | 任意 | 任意 |
+| 1つ | なし | 必須 | 省略可 |
+| 2つ | なし | 必須 | 任意 |
 | 3つ以上 | なし | 必須 | 必須 |
 | 任意 | あり | 必須 | 必須 |
 
-- **省略可**: 親が直接 task_N.md を作成し、フェーズ2に入ってよい
-- **任意**: 親の判断で省略可。ただし分解の質に自信がない場合はdecomposerを使う
 - **必須**: decomposer/aggregator を必ず起動する
+- **省略可**: aggregator を省略し、親が直接 report を生成してよい（Phase 1 は省略不可）
+- **任意**: 親の判断で aggregator を省略可。ただし複数結果の統合が必要な場合は aggregator を使う
 
-省略時の手順:
+**Phase 1 例外条件**: 以下の場合に限り Phase 1 を省略してよい
+- 1ファイル1箇所の typo修正（誤字脱字のみ）
+- 既存ファイルへの1行追加・削除（新規実装・ロジック変更を含まない）
+- `config.yaml` の単一値変更（version bump、閾値変更等）
+- `execution_log.yaml` の更新
+- 承認フローの実施（Memory MCP書き込み、改善提案のコミット等）
+- ユーザーへの報告・説明のみ
+
+上記例外を除き、**Phase 1 は必須**である。タスクが単純に見えても、decomposer を起動してタスク分解を行うこと。
+
+Phase 1 省略時の手順（例外条件に該当する場合のみ）:
 1. `work/cmd_xxx/request.md` に依頼を書く
-2. 直接フェーズ2（実行）に入り、実働サブエージェントで処理する
-3. サブタスクが1つの場合、report.md は実働の result をそのまま人間に報告してよい
-4. **Phase 3 省略時の report_summary.md 生成**: Phase 4（回顧）が有効な場合、親は result_N.md のメタデータヘッダー（先頭20行）から最小限の `report_summary.md` を生成する。フォーマット:
+2. 親が直接 `work/cmd_xxx/tasks/task_1.md` を作成する
+3. フェーズ2（実行）に入り、実働サブエージェントで処理する
+4. サブタスクが1つの場合、report.md は実働の result をそのまま人間に報告してよい
+5. **Phase 3 省略時の report_summary.md 生成**: Phase 4（回顧）が有効な場合、親は result_N.md のメタデータヘッダー（先頭20行）から最小限の `report_summary.md` を生成する。フォーマット:
    ```markdown
    ---
    generated_by: "claude-crew v{version}"
@@ -428,6 +439,28 @@ TEMPLATE_PATH: templates/xxx.md
 
 ## 操作別ポリシー
 
+### パーミッション判定フロー
+
+Bash tool 呼び出し時の優先度順の判定フロー:
+
+```
+Bash tool 呼び出し
+    ↓
+[Tier 1] settings.json deny → 自動拒否
+    ↓ not matched
+[Tier 2] settings.json allow → 自動許可
+    ↓ not matched
+[Tier 3] PermissionRequest hook → scripts/ or .claude/hooks/ なら自動許可
+    ↓ not matched
+[Tier 4] settings.json ask → 条件付き確認
+    ↓ not matched
+ユーザーに確認ダイアログ表示
+```
+
+deny > allow > hook > ask > default の優先順位で判定される。hookは allow に該当しないコマンドでも、条件を満たせば自動承認できる補完メカニズム。
+
+### 操作カテゴリ別ポリシー
+
 3段階制御: deny（自動拒否）> ask（毎回確認）> allow（自動許可）
 
 | 操作カテゴリ | ポリシー |
@@ -435,7 +468,7 @@ TEMPLATE_PATH: templates/xxx.md
 | Git 全般（status, diff, log, add, commit 等） | 自動許可（allow: `git *`） |
 | GitHub CLI | 自動許可（allow: `gh *`） |
 | Bash ユーティリティ（ls, pwd, mkdir, date, wc, tail, head, grep, cat, sort, which, touch, cp, mv, diff） | 自動許可（allow リスト） |
-| スクリプト実行（`./scripts/*` + PermissionRequest hook） | 自動許可（allow + hook 補完。詳細は `.claude/hooks/permission-fallback.sh` 参照） |
+| スクリプト実行（scripts/ 配下・.claude/hooks/ 配下） | hook経由で自動許可（PermissionRequest hook が6段階検証後に承認。詳細は `.claude/hooks/permission-fallback.sh` 参照） |
 | ファイル操作ツール（Read, Glob, Grep） | 自動許可（allow リスト） |
 | ファイル書き込み（Edit, Write） | 自動許可（allow リスト） |
 | Git push（force push含む） | 毎回確認（ask: `git*push*`） |

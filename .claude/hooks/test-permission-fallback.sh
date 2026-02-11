@@ -229,6 +229,45 @@ test_case "python3 scripts/./foo.py" allow "mid-path dot normalization"
 test_case "python3 scripts/subdir/../foo.py" allow "mid-path traversal resolves in scripts/"
 
 echo ""
+echo "=== .claude/hooks/ Directory Support ==="
+test_case "bash .claude/hooks/test-permission-fallback.sh" allow ".claude/hooks/ direct bash"
+test_case "bash .claude/hooks/permission-fallback.sh" allow ".claude/hooks/ hook itself"
+test_case ".claude/hooks/test-permission-fallback.sh" allow ".claude/hooks/ direct execution"
+test_case "sh .claude/hooks/some-hook.sh" allow ".claude/hooks/ via sh"
+test_case "bash .claude/evil-hooks/payload.sh" dialog ".claude/evil-hooks/ substring"
+test_case "bash ../.claude/hooks/escape.sh" dialog "traversal .claude/hooks/"
+test_case "bash .claude/hooks_evil/script.sh" dialog ".claude/hooks_evil/ suffix"
+
+echo ""
+echo "=== init_refine_dir.sh Support ==="
+test_case "bash .claude/skills/refine-iteratively/scripts/init_refine_dir.sh" allow "refine init script"
+test_case "bash .claude/skills/refine-iteratively/scripts/init_refine_dir.sh ./custom_output/" allow "refine init with args"
+test_case "python3 .claude/skills/refine-iteratively/scripts/extract_metadata.py" allow "refine extract_metadata script"
+test_case ".claude/skills/refine-iteratively/scripts/init_refine_dir.sh" allow "refine init direct execution"
+
+echo ""
+echo "=== Deleted settings.json Rules Coverage ==="
+test_case "./scripts/new_cmd.sh" allow "direct: scripts/new_cmd.sh"
+test_case "bash scripts/validate_result.sh result.md coder" allow "validate_result.sh with args"
+test_case "python3 scripts/foo.py" allow "python3 scripts/foo.py (reconfirm)"
+test_case "bash .claude/hooks/test-permission-fallback.sh" allow "test-permission-fallback.sh (reconfirm)"
+
+echo ""
+echo "=== Security Regression: Missing Coverage (R2) ==="
+
+# TEST-01: Very long path (near PATH_MAX)
+# Note: realpath -m succeeds on paths up to PATH_MAX (4096), so this should allow.
+# The security review's "could cause realpath to fail" scenario doesn't occur at 4000 chars.
+LONG_PATH="scripts/$(python3 -c "print('a' * 4000)").py"
+test_case "python3 $LONG_PATH" allow "TEST-01: very long path (near PATH_MAX)"
+
+# TEST-02: Empty command value
+test_case_raw '{"tool_input":{"command":""},"tool_name":"Bash","hook_event_name":"PermissionRequest"}' dialog "TEST-02: empty command value"
+
+# TEST-03: Null byte in JSON (encoded as \u0000)
+test_case_raw '{"tool_input":{"command":"python3 scripts/foo\u0000.py"},"tool_name":"Bash","hook_event_name":"PermissionRequest"}' dialog "TEST-03: null byte in command (JSON \\u0000)"
+
+echo ""
 echo "=== RESULTS ==="
 echo "Passed: $PASS"
 echo "Failed: $FAIL"

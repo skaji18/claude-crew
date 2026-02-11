@@ -9,8 +9,20 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 - **permission-fallback.sh rewrite** — replaced regex-based guards with 6-phase structured validation pipeline (sanitize → pre-parse → parse → normalize options → normalize path → judge); adds defenses against null byte injection, path traversal, tilde/glob expansion, no-space flag bypass, and tool_name spoofing
 - **permission-fallback.sh direct execution support** — shebang ベースの直接実行（`./scripts/foo.sh`）を自動承認対象に追加; Phase 3 で未知インタプリタをスクリプトパスとして扱い Phase 5-6 のパス検証に委譲
-- **settings.json hook test pattern** — `.claude/hooks/` テストスクリプト実行パターンを明示的ファイル名で追加（glob traversal 対策）
-- **permission-fallback tests expanded** — added `test_case_raw` helper and security regression tests covering all identified attack vectors (newline/CR injection, path traversal, greedy match, dangerous bash flags, variable expansion, substring match, tool_name check); direct execution tests (14 cases) and shell builtin rejection tests added
+- **permission-fallback.sh `.claude/hooks/` support** — Phase 6 に `.claude/hooks/` 配下のスクリプト自動承認を追加; substring attack 耐性を維持
+- **permission-fallback.sh data-driven config** — インタプリタ許可リスト・安全/危険フラグをファイル先頭の設定ブロックに抽出; 新インタプリタ追加が設定変更のみで可能に
+- **permission-fallback.sh debug mode** — `PERMISSION_DEBUG=1` で拒否理由をstderrに出力する `reject()` 関数を追加; 全拒否ポイントに構造化理由コード付与（S0〜P7, Phase 5-6）
+- **permission-fallback.sh defense-in-depth** — jq未インストール時のstderr警告追加; `CLAUDE_PROJECT_DIR` 環境変数をスクリプト自身の位置と交差検証
+- **settings.json permission consolidation** — `Bash(./scripts/*)` と `Bash(bash .claude/hooks/test-permission-fallback.sh)` を削除; スクリプト実行承認を permission-fallback.sh hook に一元化
+- **permission-fallback tests expanded** — 95→117件に拡張; null byte, 空コマンド, 長パス, `.claude/hooks/` 境界, init_refine_dir.sh, settings.json削除カバレッジを追加
+- **CLAUDE.md workflow enforcement** — crew ワークフロー必須化（親セッションの Edit/Write 禁止）、Phase 1 必須化、例外条件6件、よくある間違いセクション追加、config.yaml YAML ブロックをクロスリファレンスに置換
+- **parent_guide.md hardening** — Phase 1 を全ケースで必須に変更; パーミッション判定フローチャート追加; `Bash(./scripts/*)` 古い参照を修正; 例外条件を CLAUDE.md と同期
+- **SKILL.md init script** — refine-iteratively に init_refine_dir.sh 参照を追加（permission-fallback.sh 自動承認対応パス）
+
+### Added
+- **`scripts/health_check.sh`** — 10項目のシステム健全性チェック（config, templates, settings.json, hook実行権限, jq, スクリプト実行権限, hookテスト, CLAUDE.md, parent_guide.md, 古い参照検出）
+- **`.claude/skills/refine-iteratively/scripts/init_refine_dir.sh`** — refine-iteratively 作業ディレクトリの標準化作成スクリプト; `*/scripts/*` パスにより permission-fallback.sh が自動承認
+- **`.claude/hooks/test-hooks-support.sh`** — `.claude/hooks/` サポート専用テストスクリプト
 
 ## [0.8.0] - 2026-02-11
 
