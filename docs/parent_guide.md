@@ -23,7 +23,6 @@
    ```bash
    ./scripts/new_cmd.sh
    ```
-   - パーミッション確認を不要にするため、スクリプトはフルパスで指定してはならない
    - スクリプト内部でmkdirのアトミック性 + 最大5回リトライにより衝突を回避
    - 成功時は `cmd_NNN` を標準出力に返す
 2. 人間の依頼内容を `work/cmd_xxx/request.md` に書く
@@ -435,10 +434,10 @@ TEMPLATE_PATH: templates/xxx.md
 |-------------|---------|
 | Git 全般（status, diff, log, add, commit 等） | 自動許可（allow: `git *`） |
 | GitHub CLI | 自動許可（allow: `gh *`） |
-| Bash ユーティリティ（ls, pwd, mkdir, date, wc, tail, head, grep, cat, sort, which, touch） | 自動許可（allow リスト） |
-| スクリプト実行（./scripts/*, skills scripts） | 自動許可（allow リスト） |
+| Bash ユーティリティ（ls, pwd, mkdir, date, wc, tail, head, grep, cat, sort, which, touch, cp, mv, diff） | 自動許可（allow リスト） |
+| スクリプト実行（`./scripts/*` + PermissionRequest hook） | 自動許可（allow + hook 補完。詳細は `.claude/hooks/permission-fallback.sh` 参照） |
 | ファイル操作ツール（Read, Glob, Grep） | 自動許可（allow リスト） |
-| ファイル書き込み（Edit, Write） | 初回確認、以降セッション中許可 |
+| ファイル書き込み（Edit, Write） | 自動許可（allow リスト） |
 | Git push（force push含む） | 毎回確認（ask: `git*push*`） |
 | Git 破壊操作（reset --hard, clean -f, checkout ., restore .） | 毎回確認（ask リスト） |
 | HTTP 変更（curl POST/PUT/PATCH） | 毎回確認（ask リスト） |

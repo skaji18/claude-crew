@@ -2,13 +2,14 @@
   "permissions": {
     "allow": [
       "Read", "Glob", "Grep",
+      "Write", "Edit",
       "Bash(git *)",
       "Bash(gh *)",
       "Bash(ls*)", "Bash(pwd)", "Bash(mkdir *)", "Bash(date*)",
       "Bash(wc *)", "Bash(tail *)", "Bash(head *)", "Bash(grep *)",
       "Bash(cat *)", "Bash(sort *)", "Bash(which *)", "Bash(touch *)",
-      "Bash(./scripts/*)",
-      "Bash(python3 .claude/skills/*/scripts/*)"
+      "Bash(cp *)", "Bash(mv *)", "Bash(diff *)",
+      "Bash(./scripts/*)"
     ],
     "ask": [
       "Bash(git*push*)",
@@ -22,6 +23,18 @@
       "Bash(* | sh)", "Bash(* | bash)",
       "Bash(chmod -R 777*)", "Bash(*> /dev/sda*)",
       "Bash(*DROP TABLE*)", "Bash(*DROP DATABASE*)"
+    ]
+  },
+  "hooks": {
+    "PermissionRequest": [
+      {
+        "matcher": "Bash",
+        "hooks": [{
+          "type": "command",
+          "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/permission-fallback.sh",
+          "timeout": 5
+        }]
+      }
     ]
   }
 }
