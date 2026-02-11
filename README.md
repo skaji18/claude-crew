@@ -31,7 +31,7 @@ The parent session directly manages all sub-agents. Sub-agents cannot spawn othe
 - **File-based communication** — Sub-agents read from and write to files. The parent passes paths, not content, keeping its context window lean.
 - **Up to 10 parallel sub-agents** — Launch multiple workers simultaneously for independent tasks.
 - **Persona switching** — Each worker can adopt a specialized role: researcher, coder, reviewer, or a custom persona defined by templates.
-- **Permission-based safety** — Claude Code's built-in permission system applies to all sub-agents. No `--dangerously-skip-permissions` required.
+- **Permission-based safety** — Claude Code's built-in permission system applies to all sub-agents, with a PermissionRequest hook (permission-fallback.sh) that dynamically approves python3/bash/sh execution of scripts under scripts/ directories via a 6-phase validation pipeline. No `--dangerously-skip-permissions` required.
 - **Single-cycle completion** — A typical request (decompose → execute → aggregate → retrospect) completes within one context window, no compaction needed.
 - **Model flexibility** — Assign `haiku` for simple tasks, `sonnet` for balanced work, `opus` for complex reasoning — per sub-agent.
 
@@ -58,11 +58,17 @@ claude-crew/
 ├── README.md                  # This file
 ├── config.yaml                # Runtime configuration
 ├── CHANGELOG.md               # Version history
+├── docs/
+│   └── parent_guide.md        # Detailed parent session processing guide
 ├── .claude/
-│   └── settings.json          # Permission settings for sub-agents
+│   ├── settings.json          # Permission settings for sub-agents
+│   └── hooks/
+│       ├── permission-fallback.sh      # PermissionRequest hook for dynamic approval (6-phase validation)
+│       └── test-permission-fallback.sh # Test suite for permission-fallback.sh (40+ security regression tests)
 ├── templates/
 │   ├── decomposer.md          # Task decomposition template
-│   ├── worker_default.md      # General-purpose worker template
+│   ├── worker_common.md       # Shared rules for all worker personas
+│   ├── worker_default.md      # General-purpose worker (DEPRECATED)
 │   ├── worker_researcher.md   # Research-focused worker template
 │   ├── worker_coder.md        # Code implementation worker template
 │   ├── worker_reviewer.md     # Code review worker template
@@ -71,7 +77,8 @@ claude-crew/
 │   ├── retrospector.md        # Post-mortem analysis template
 │   └── multi_analysis.md      # N-viewpoint parallel analysis framework
 ├── scripts/
-│   └── new_cmd.sh             # Utility scripts
+│   ├── new_cmd.sh             # Atomic cmd directory creation
+│   └── validate_result.sh     # Result file validation (JSON output)
 └── work/
     └── cmd_xxx/               # Working directory per request
         ├── request.md
@@ -138,7 +145,8 @@ Templates define how sub-agents behave. They are prompt instructions injected in
 | Template | Role | When to use |
 |----------|------|-------------|
 | `decomposer.md` | Breaks a request into independent tasks | Automatically used at the start of each cycle |
-| `worker_default.md` | General-purpose worker | Tasks that don't fit a specialized role |
+| `worker_common.md` | Shared rules for all worker personas | Included by all worker templates (output format, Memory MCP rules) |
+| `worker_default.md` | General-purpose worker (DEPRECATED) | Use a specialized persona instead |
 | `worker_researcher.md` | Information gathering and analysis | Research, surveys, competitive analysis |
 | `worker_writer.md` | Documentation and content creation | README, guides, tutorials, specifications |
 | `worker_coder.md` | Code implementation | Writing code, fixing bugs, refactoring |

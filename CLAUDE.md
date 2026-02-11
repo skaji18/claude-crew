@@ -37,6 +37,9 @@ retrospect:
     max_skills: 1
   light_mode:
     max_skills: 2
+  memory:
+    max_candidates_per_cmd: 5
+    skill_min_score: 12
 ```
 
 ## バージョン管理
@@ -71,6 +74,7 @@ retrospect:
 - サブエージェントは親セッションのパーミッション設定を継承する
 - 3段階制御: deny（自動拒否）> ask（毎回確認）> allow（自動許可）
 - 詳細は `.claude/settings.json` 参照。deny リストの操作はバイパス不可
+- **PermissionRequest hook**: `.claude/hooks/permission-fallback.sh` は python3/bash/sh による scripts/ 配下スクリプト実行を動的に承認する。6段階検証パイプライン（正規化 → 前解析 → 解析 → オプション正規化 → パス正規化 → 判定）で入力を厳密に検証し、path traversal/変数展開/危険フラグ注入を防止する
 
 ## Memory MCP活用
 

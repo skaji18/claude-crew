@@ -31,7 +31,7 @@ claude-crewは、1つのClaude Codeセッションを複数のサブエージェ
 - **ファイルベースの通信** — サブエージェントはファイルを読み書きして連携する。親はパスだけを渡し、コンテキストウィンドウを軽量に保つ。
 - **最大10並列のサブエージェント** — 独立したタスクに対して複数のWorkerを同時に起動できる。
 - **ペルソナ切り替え** — 各Workerはリサーチャー、コーダー、レビュアーなどの専門的な役割を担当可能。テンプレートでカスタムペルソナも定義できる。
-- **パーミッションによる安全性** — Claude Code標準のパーミッションシステムが全サブエージェントに適用される。`--dangerously-skip-permissions` は不要。
+- **パーミッションによる安全性** — Claude Code標準のパーミッションシステムが全サブエージェントに適用される。PermissionRequest hook (permission-fallback.sh) により、scripts/ 配下のpython3/bash/shスクリプト実行を6段階検証パイプラインで動的に承認する。`--dangerously-skip-permissions` は不要。
 - **1サイクル完結** — 一般的なリクエスト（分解→実行→集約→回顧）は1つのコンテキストウィンドウ内で完了し、コンパクションは不要。
 - **モデルの柔軟な選択** — サブエージェントごとに、軽い作業には `haiku`、標準的な作業には `sonnet`、複雑な推論には `opus` を割り当てられる。
 
@@ -58,11 +58,17 @@ claude-crew/
 ├── README.md                  # 英語版README
 ├── config.yaml                # 実行時設定
 ├── CHANGELOG.md               # 変更履歴
+├── docs/
+│   └── parent_guide.md        # 親セッション詳細処理ガイド
 ├── .claude/
-│   └── settings.json          # サブエージェントのパーミッション設定
+│   ├── settings.json          # サブエージェントのパーミッション設定
+│   └── hooks/
+│       ├── permission-fallback.sh      # PermissionRequest hook（6段階検証パイプライン）
+│       └── test-permission-fallback.sh # permission-fallback.sh のテストスイート
 ├── templates/
 │   ├── decomposer.md          # タスク分解テンプレート
-│   ├── worker_default.md      # 汎用Workerテンプレート
+│   ├── worker_common.md       # 全workerペルソナ共通ルール
+│   ├── worker_default.md      # 汎用Workerテンプレート（DEPRECATED）
 │   ├── worker_researcher.md   # 調査特化Workerテンプレート
 │   ├── worker_coder.md        # コード実装Workerテンプレート
 │   ├── worker_reviewer.md     # コードレビューWorkerテンプレート
@@ -71,7 +77,8 @@ claude-crew/
 │   ├── retrospector.md        # 回顧分析テンプレート
 │   └── multi_analysis.md      # N観点並列分析フレームワーク
 ├── scripts/
-│   └── new_cmd.sh             # ユーティリティスクリプト
+│   ├── new_cmd.sh             # Atomic cmd directory creation
+│   └── validate_result.sh     # 結果ファイル検証（JSON出力）
 └── work/
     └── cmd_xxx/               # リクエストごとの作業ディレクトリ
         ├── request.md
@@ -138,7 +145,8 @@ claude-crew/
 | テンプレート | 役割 | 使用場面 |
 |-------------|------|---------|
 | `decomposer.md` | リクエストを独立したタスクに分解 | 各サイクルの開始時に自動使用 |
-| `worker_default.md` | 汎用Worker | 専門的な役割に該当しないタスク |
+| `worker_common.md` | 全workerペルソナ共通ルール | 全worker_*.mdテンプレートから参照される（YAML frontmatter、Memory MCP候補生成ルール、必須ルール） |
+| `worker_default.md` | 汎用Worker（DEPRECATED） | 使用禁止 — 専門ペルソナ（researcher/writer/coder/reviewer）を使用せよ |
 | `worker_researcher.md` | 情報収集と分析 | リサーチ、調査、競合分析 |
 | `worker_writer.md` | ドキュメント作成・コンテンツ執筆 | README、ガイド、チュートリアル、仕様書 |
 | `worker_coder.md` | コード実装 | コーディング、バグ修正、リファクタリング |

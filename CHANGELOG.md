@@ -56,7 +56,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   - `scripts/validate_round.py` — round quality/completeness threshold validation
   - `scripts/generate_feedback.py` — structured improvement feedback generation
   - `scripts/consolidate_report.py` — multi-round final report consolidation
-- **Skill scripts permission** in `.claude/settings.json` — added `Bash(python3 .claude/skills/*/scripts/*)` to allow list
+- **Skill scripts permission** in `.claude/settings.json` — added `Bash(./scripts/*)` to allow list for script execution
 
 ## [0.7.2] - 2026-02-08
 
