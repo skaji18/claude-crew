@@ -6,6 +6,48 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0-rc] - 2026-02-11
+
+### Added (v1.0-rc Features)
+
+#### Self-Awareness (W1, W3, W5)
+- **F15**: Pre-flight plan validation (Phase 1.5) — Optional reviewer validates decomposer's plan against original request before execution begins; gated by `plan_validation` config field
+- **F16**: Capability self-assessment (W3) — Decomposer warns when task exceeds reliable scope (>10 files, >1000 LOC, >5 cross-file dependencies); prevents scope creep failures
+- **F17**: Aggregator conflict detection (W5) — Detects contradictions between worker results and classifies as COSMETIC (wording) vs FUNDAMENTAL (opposing approaches); resolves with evidence-based reasoning or escalates unresolvable conflicts
+
+#### Learnability (W2, W4)
+- **F21**: Failure forensics (W2) — Anti-pattern Memory MCP entities extracted from failed tasks with mitigations; rejection memory prevents repeated proposal submissions in rejected categories
+- **F22**: Workflow pattern mining (W4) — `analyze_patterns.sh` script parses execution logs to identify success rates, durations, and task sequences; patterns.md consumed by decomposer for informed planning
+
+#### Extensibility
+- **F14**: Custom personas — Decomposer auto-discovers user-defined personas in `personas/*.md` directory with optional persona templates
+
+#### Observability
+- **F19**: Plan visualization — `visualize_plan.sh` generates Mermaid flowchart diagrams from plan.md showing task dependencies and Wave groupings
+- **F24**: ETA in Wave progress — Wave messages include estimated time remaining based on historical stats.sh data with fallback persona estimates
+
+#### Quality Assurance
+- **F23**: Phase instructions config — `phase_instructions:` block in config.yaml allows custom per-phase instructions without modifying templates
+- **F26**: Documentation audit — All 24 features systematically verified for documentation coverage; code-docs alignment confirmed; 3 gaps identified and fixed
+- **F27**: Validation pass — CHANGELOG updated, version consistency verified, implementation completeness confirmed
+
+### Changed
+- `templates/decomposer.md`: Added Custom Persona Discovery section (F14), Scope Assessment section (F16), Anti-Pattern Awareness section (F21), Historical Patterns section (F22)
+- `templates/aggregator.md`: Added Conflict Detection & Resolution step (F17) with COSMETIC vs FUNDAMENTAL classification
+- `templates/retrospector.md`: Added Failure Signature Extraction section (F21), Rejection Memory Check section; updated Memory MCP search to include antipattern entities
+- `docs/parent_guide.md`: Added Phase 1.5 Pre-Flight Plan Validation section (F15), Rejection Memory Storage subsection in Phase 4 (F21), Wave Progress Messages with ETA calculation (F24), phase_instructions injection notes
+- `config.yaml`: Added `plan_validation: true` field (F15), `phase_instructions:` block with 4 phase fields (F23)
+- `CLAUDE.md`: Updated architecture diagram to include Phase 1.5 (F15)
+- `README.md`: Added Scripts section documenting all 9 utility scripts (F26)
+
+### Added (New Files)
+- `personas/.gitkeep` — Directory marker for user-defined persona templates (F14)
+- `scripts/visualize_plan.sh` — Mermaid diagram generator for plan.md (F19)
+- `scripts/analyze_patterns.sh` — Workflow pattern mining from execution logs (F22)
+
+### Dependencies
+- Builds on v0.9.0 Foundation & Measurement features (F01-F13)
+
 ## [0.9.0] - 2026-02-11
 
 ### Added

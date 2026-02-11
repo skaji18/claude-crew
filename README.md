@@ -182,6 +182,24 @@ work/
 
 Everything is a plain Markdown file. You can inspect, edit, or reuse any intermediate output.
 
+## Scripts
+
+The framework includes utility scripts for validation, testing, and analysis:
+
+| Script | Purpose | Usage |
+|--------|---------|-------|
+| `setup.sh` | Prerequisites check + quick-start guide | `bash scripts/setup.sh` |
+| `smoke_test.sh` | End-to-end infrastructure test | `bash scripts/smoke_test.sh` |
+| `validate_config.sh` | Validate config.yaml fields and types | `bash scripts/validate_config.sh` |
+| `validate_result.sh` | Validate result file metadata and completeness | `bash scripts/validate_result.sh <result_path> <persona>` |
+| `stats.sh` | Parse execution logs for success rates and durations | `bash scripts/stats.sh [work_dir]` |
+| `visualize_plan.sh` | Generate Mermaid diagram from plan.md | `bash scripts/visualize_plan.sh [plan_path]` |
+| `analyze_patterns.sh` | Extract workflow patterns from execution logs | `bash scripts/analyze_patterns.sh [output_path]` |
+| `new_cmd.sh` | Create new cmd directory atomically | `bash scripts/new_cmd.sh` |
+| `health_check.sh` | Basic file structure validation | `bash scripts/health_check.sh` |
+
+All scripts follow bash best practices (`set -euo pipefail`) and include usage documentation in their headers.
+
 ## Constraints and Notes
 
 - **No nesting** — Sub-agents cannot launch other sub-agents. This is a Claude Code platform limitation. The framework works around this with a sequential phase approach (decompose → execute → aggregate → retrospect), where the parent bridges each phase.
