@@ -20,23 +20,15 @@ After reading the request, search Memory MCP for past patterns **before** decomp
 
 1. Search for past failure patterns and lessons learned:
    ```
-   mcp__memory__search_nodes(query="claude-crew:failure_pattern")
-   mcp__memory__search_nodes(query="claude-crew:lesson_learned")
+   mcp__memory__search_nodes(query="failure_pattern")
+   mcp__memory__search_nodes(query="lesson_learned")
    ```
 2. If results are found: review the observations and consider them as constraints or cautions during task decomposition (see "Applying Past Patterns" below)
 3. If no results are found (empty or Memory MCP unavailable): proceed with normal decomposition. Memory is supplementary, not required
 
 ### Entity Naming Convention
 
-Memory MCP entities follow the naming pattern: `claude-crew:{type}:{identifier}`
-
-| Type | Description | Example |
-|------|-------------|---------|
-| `failure_pattern` | Recurring failure patterns from past cmds | `claude-crew:failure_pattern:result_file_missing` |
-| `lesson_learned` | Lessons derived from past failures | `claude-crew:lesson_learned:haiku_complex_task_failure` |
-| `success_pattern` | Successful execution patterns | `claude-crew:success_pattern:parallel_comparison_workflow` |
-| `best_practice` | Proven best practices | `claude-crew:best_practice:task_granularity_limit` |
-| `skill_candidate` | Reusable workflow candidates | `claude-crew:skill_candidate:tech_comparison_analysis` |
+Memory MCP entities follow the `{domain}:{category}:{identifier}` naming convention. See CLAUDE.md "Memory MCP候補の品質基準" section for details.
 
 ### Applying Past Patterns
 

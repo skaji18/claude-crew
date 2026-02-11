@@ -6,6 +6,28 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-02-11
+
+### Changed
+- **CLAUDE.md split** (INT-001) — moved detailed processing flows, execution log specs, and parent session rules to `docs/parent_guide.md`; CLAUDE.md reduced from 539 lines to ~70 lines for sub-agent context optimization
+- **Phase 2 validation consolidation** (INT-002) — replaced 4 individual Bash calls (tail, wc, grep×2) per task with single `scripts/validate_result.sh` call; 75% reduction in tool invocations
+- **Approval flow consolidation** (EXT-002) — merged Phase 3 Memory MCP approval and Phase 4 proposals into single post-Phase 4 batch review; reduced human interaction from 4 rounds to 1
+- **Template common rules extraction** (INT-004) — created `templates/worker_common.md` with shared Output Format, Memory MCP candidate rules, and common Rules; eliminated ~188 lines of duplication across 5 worker templates
+
+### Added
+- **`scripts/validate_result.sh`** (INT-002) — unified result validation script outputting JSON with complete_marker, line_count, section checks, and pass/fail status
+- **`docs/parent_guide.md`** (INT-001) — detailed parent session guide (processing flow, execution log, checkpoint restart, phase skip rules)
+- **`templates/worker_common.md`** (INT-004) — shared rules and output format for all worker personas
+- **Phase 2 progress messages** (EXT-001) — Wave start/completion messages displayed to user during execution
+
+## [0.7.5] - 2026-02-11
+
+### Fixed
+- **decomposer.md Memory MCP naming contradiction** (INT-003) — removed `claude-crew:{type}:{identifier}` naming convention that conflicted with CLAUDE.md instant-reject filter; unified to `{domain}:{category}:{identifier}`
+
+### Changed
+- **worker_default.md deprecation** (INT-005) — added DEPRECATED warning banner; marked as deprecated in CLAUDE.md template reference table
+
 ## [0.7.4] - 2026-02-10
 
 ### Changed
