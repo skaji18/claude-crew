@@ -7,6 +7,16 @@
 
 人間からタスクを受けたら、以下の4フェーズで処理する。
 
+### コミット準備
+
+フレームワークファイルへの変更を追跡するため、cmd開始時にベースコミットを記録する:
+
+1. 現在のHEADをベースコミットとして取得する:
+   ```bash
+   git rev-parse HEAD
+   ```
+2. execution_log.yaml のトップレベルに `base_commit: {hash}` を記録する
+
 ### フェーズ1: 分解（Decompose）
 
 1. `work/cmd_xxx/` ディレクトリを作成する（xxxは連番）:
@@ -148,11 +158,51 @@ Phase 4 完了後（または Phase 4 スキップ時は Phase 3 完了後）、
 
 ユーザーが一括で承認/却下を判断する。承認された候補のみ処理する:
 
-- **改善提案**: 人間と共に対象ファイル（テンプレート、config.yaml 等）を修正
+- **改善提案**: 承認された各改善に対して以下を実行:
+  1. 対象ファイルに変更を適用する
+  2. CHANGELOG.md の `## [Unreleased]` に適切なカテゴリ（Added/Changed/Fixed/Deprecated/Removed）でエントリを追加する
+     - フォーマット: `- **{対象}** ({改善ID}) — {説明}`
+  3. 変更ファイルと CHANGELOG.md をステージする:
+     ```bash
+     git add {変更ファイル} CHANGELOG.md
+     ```
+  4. Conventional Commits 形式でコミットする:
+     ```bash
+     git commit -m "$(cat <<'EOF'
+     {type}({scope}): {description}
+
+     Co-Authored-By: Claude <noreply@anthropic.com>
+     EOF
+     )"
+     ```
+  5. **コミットしない場合**: work/ 配下のみの変更、またはユーザーが却下した場合
+
+  **type マッピング**:
+
+  | 改善の種類 | type |
+  |-----------|------|
+  | 新機能追加 | `feat` |
+  | 既存機能の変更・強化 | `feat` |
+  | バグ修正 | `fix` |
+  | リファクタリング | `refactor` |
+  | ドキュメントのみ | `docs` |
+
+  **scope**: 変更対象ディレクトリ（`templates`, `config`, `scripts`, `docs` 等）
+
 - **スキル化提案**: スキル設計書を作成
 - **Memory MCP候補**: サブエージェント（haiku, max_turns=5）に委譲して `mcp__memory__create_entities` で追加
 
 全ての適用結果を `execution_log.yaml` に記録する。
+
+### コミット履歴の確認
+
+一括承認フロー完了後、cmd中に作成されたコミットをユーザーに表示する:
+
+```bash
+git log --oneline ${BASE_COMMIT}..HEAD
+```
+
+コミットがない場合（承認された改善が work/ 外のファイルを変更しなかった場合）は表示をスキップする。
 
 ## 親セッションの行動ルール
 
@@ -176,6 +226,7 @@ cmd_id: cmd_xxx
 started: "2026-02-07 10:00:00"
 finished: null
 status: running
+base_commit: "cfa49a0"
 
 tasks:
   - id: 1

@@ -44,6 +44,7 @@ retrospect:
 - `config.yaml` の `version` が現在のバージョン
 - 成果物にはYAMLフロントマターで `generated_by`, `date`, `cmd_id` を含める
 - `CHANGELOG.md` に変更履歴を記録
+- 改善提案の承認時、Conventional Commits 形式で自動コミットする（詳細は `docs/parent_guide.md` 参照）
 
 ## テンプレート参照規約
 
