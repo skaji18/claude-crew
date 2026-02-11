@@ -5,7 +5,9 @@
 # settings.json の glob でカバーしきれないスクリプト実行を自動承認する。
 #
 # 前提: このスクリプトに到達する = settings.json の deny を通過済み
-# 目的: python3/bash/sh 経由の scripts/ 配下スクリプト実行を allow する
+# 目的: scripts/ 配下スクリプト実行を allow する
+#   - python3/bash/sh 経由の実行
+#   - 直接実行（shebang ベース: ./scripts/foo.sh）
 #
 # 設計原則: 「入力を正規化してから判定」
 #   1. 制御文字を拒否 (sanitize)
@@ -95,11 +97,16 @@ read -ra WORDS <<< "$COMMAND"
 [[ ${#WORDS[@]} -lt 1 ]] && exit 0
 
 INTERPRETER="${WORDS[0]}"
+SCRIPT_PATH=""
 
-# Only allow known interpreters
+# Only allow known interpreters — or treat as direct execution
 case "$INTERPRETER" in
   python3|bash|sh) ;;
-  *) exit 0 ;;
+  *)
+    # Direct execution (shebang-based): first word is the script path itself.
+    # No interpreter options to parse — skip Phase 4, go to Phase 5.
+    SCRIPT_PATH="$INTERPRETER"
+    ;;
 esac
 
 # =======================================================
@@ -120,55 +127,58 @@ esac
 # Strategy for flags attached to values (e.g., -c"code", -mmodule):
 #   If a word starts with a known dangerous flag prefix, reject.
 
-SCRIPT_PATH=""
-IDX=1
+# Phase 4 only applies when a known interpreter is used.
+# For direct execution (shebang), SCRIPT_PATH was already set in Phase 3.
+if [[ -z "$SCRIPT_PATH" ]]; then
+  IDX=1
 
-while [[ $IDX -lt ${#WORDS[@]} ]]; do
-  WORD="${WORDS[$IDX]}"
+  while [[ $IDX -lt ${#WORDS[@]} ]]; do
+    WORD="${WORDS[$IDX]}"
 
-  if [[ "$WORD" == -* ]]; then
-    # --- Option word ---
+    if [[ "$WORD" == -* ]]; then
+      # --- Option word ---
 
-    # Dangerous flags: exact match or prefix match (handles -c"code", -mmod)
-    case "$WORD" in
-      # Exact matches for flags that take a following argument
-      -c|--command|-e|--eval|-m)
-        exit 0
-        ;;
-      # Prefix matches: -c"code", -ccode, -mmodule, -e"code"
-      -c*|-e*|-m*)
-        # Distinguish from safe single-char flags like -B, -u
-        # -c, -e, -m followed by more chars = dangerous (value attached)
-        # But single-char flags like -B are exactly 2 chars and not -c/-e/-m
-        exit 0
-        ;;
-      # Bash-specific dangerous flags
-      --init-file|--rcfile|-i)
-        [[ "$INTERPRETER" == "bash" || "$INTERPRETER" == "sh" ]] && exit 0
-        ;;
-    esac
-
-    # Safe single-char flags for python3 (exactly 2 chars: dash + letter)
-    if [[ "$INTERPRETER" == "python3" && ${#WORD} -eq 2 ]]; then
+      # Dangerous flags: exact match or prefix match (handles -c"code", -mmod)
       case "$WORD" in
-        -u|-B|-s|-S|-v|-b|-q|-O|-I|-E|-P|-R)
-          # Known safe python3 flags — skip
-          ((IDX++))
-          continue
+        # Exact matches for flags that take a following argument
+        -c|--command|-e|--eval|-m)
+          exit 0
+          ;;
+        # Prefix matches: -c"code", -ccode, -mmodule, -e"code"
+        -c*|-e*|-m*)
+          # Distinguish from safe single-char flags like -B, -u
+          # -c, -e, -m followed by more chars = dangerous (value attached)
+          # But single-char flags like -B are exactly 2 chars and not -c/-e/-m
+          exit 0
+          ;;
+        # Bash-specific dangerous flags
+        --init-file|--rcfile|-i)
+          [[ "$INTERPRETER" == "bash" || "$INTERPRETER" == "sh" ]] && exit 0
           ;;
       esac
+
+      # Safe single-char flags for python3 (exactly 2 chars: dash + letter)
+      if [[ "$INTERPRETER" == "python3" && ${#WORD} -eq 2 ]]; then
+        case "$WORD" in
+          -u|-B|-s|-S|-v|-b|-q|-O|-I|-E|-P|-R)
+            # Known safe python3 flags — skip
+            ((IDX++))
+            continue
+            ;;
+        esac
+      fi
+
+      # Unknown flag — fail closed (show dialog)
+      exit 0
+    else
+      # --- Positional argument = script path ---
+      SCRIPT_PATH="$WORD"
+      break
     fi
 
-    # Unknown flag — fail closed (show dialog)
-    exit 0
-  else
-    # --- Positional argument = script path ---
-    SCRIPT_PATH="$WORD"
-    break
-  fi
-
-  ((IDX++))
-done
+    ((IDX++))
+  done
+fi
 
 # No script path found
 [[ -z "$SCRIPT_PATH" ]] && exit 0

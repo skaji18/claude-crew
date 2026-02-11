@@ -8,7 +8,9 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 - **permission-fallback.sh rewrite** — replaced regex-based guards with 6-phase structured validation pipeline (sanitize → pre-parse → parse → normalize options → normalize path → judge); adds defenses against null byte injection, path traversal, tilde/glob expansion, no-space flag bypass, and tool_name spoofing
-- **permission-fallback tests expanded** — added `test_case_raw` helper and security regression tests covering all identified attack vectors (newline/CR injection, path traversal, greedy match, dangerous bash flags, variable expansion, substring match, tool_name check)
+- **permission-fallback.sh direct execution support** — shebang ベースの直接実行（`./scripts/foo.sh`）を自動承認対象に追加; Phase 3 で未知インタプリタをスクリプトパスとして扱い Phase 5-6 のパス検証に委譲
+- **settings.json hook test pattern** — `.claude/hooks/` テストスクリプト実行パターンを明示的ファイル名で追加（glob traversal 対策）
+- **permission-fallback tests expanded** — added `test_case_raw` helper and security regression tests covering all identified attack vectors (newline/CR injection, path traversal, greedy match, dangerous bash flags, variable expansion, substring match, tool_name check); direct execution tests (14 cases) and shell builtin rejection tests added
 
 ## [0.8.0] - 2026-02-11
 

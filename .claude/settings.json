@@ -9,7 +9,8 @@
       "Bash(wc *)", "Bash(tail *)", "Bash(head *)", "Bash(grep *)",
       "Bash(cat *)", "Bash(sort *)", "Bash(which *)", "Bash(touch *)",
       "Bash(cp *)", "Bash(mv *)", "Bash(diff *)",
-      "Bash(./scripts/*)"
+      "Bash(./scripts/*)",
+      "Bash(bash .claude/hooks/test-permission-fallback.sh)"
     ],
     "ask": [
       "Bash(git*push*)",
