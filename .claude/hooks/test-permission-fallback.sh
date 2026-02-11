@@ -31,6 +31,29 @@ test_case() {
   fi
 }
 
+# test_case_raw: accepts pre-built JSON (for cases with control chars, custom tool_name, etc.)
+test_case_raw() {
+  local input="$1" expected="$2" desc="$3"
+  local output
+  output=$(printf '%s' "$input" | bash "$HOOK" 2>/dev/null)
+
+  if [ "$expected" = "allow" ]; then
+    if echo "$output" | jq -e '.hookSpecificOutput.decision.behavior == "allow"' >/dev/null 2>&1; then
+      ((PASS++))
+    else
+      echo "FAIL [$desc]: expected allow, got: $output"
+      ((FAIL++))
+    fi
+  elif [ "$expected" = "dialog" ]; then
+    if [ -z "$output" ]; then
+      ((PASS++))
+    else
+      echo "FAIL [$desc]: expected dialog (empty), got: $output"
+      ((FAIL++))
+    fi
+  fi
+}
+
 echo "=== Basic Allow Cases ==="
 test_case "python3 scripts/foo.py" allow "python3 + relative"
 test_case "python3 ./scripts/foo.py" allow "python3 + dotslash"
@@ -106,6 +129,86 @@ test_case "npm install" dialog "unrelated command"
 test_case "python3 foo.py" dialog "python3 without scripts/"
 test_case "git push" dialog "git push"
 test_case "node scripts/test.js" dialog "node (not in allowed interpreters)"
+
+echo ""
+echo "=== Security Regression: E-01 Newline Injection ==="
+test_case_raw '{"tool_input":{"command":"python3 scripts/foo.py\nrm -rf /"},"tool_name":"Bash","hook_event_name":"PermissionRequest"}' dialog "E-01: newline injection (JSON \\n)"
+test_case_raw '{"tool_input":{"command":"python3 scripts/foo.py\n\nmalicious"},"tool_name":"Bash","hook_event_name":"PermissionRequest"}' dialog "E-01: double newline injection"
+
+echo ""
+echo "=== Security Regression: NEW-02 CR Injection ==="
+test_case_raw '{"tool_input":{"command":"python3 scripts/foo.py\rrm -rf /"},"tool_name":"Bash","hook_event_name":"PermissionRequest"}' dialog "NEW-02: carriage return injection"
+test_case_raw '{"tool_input":{"command":"python3 scripts/foo.py\r\nrm -rf /"},"tool_name":"Bash","hook_event_name":"PermissionRequest"}' dialog "NEW-02: CRLF injection"
+
+echo ""
+echo "=== Security Regression: E-02 Path Traversal ==="
+test_case "python3 scripts/../../../etc/passwd" dialog "E-02: path traversal escape project"
+test_case "python3 scripts/../../etc/shadow" dialog "E-02: path traversal double .."
+test_case "python3 scripts/sub/../foo.py" allow "E-02: path traversal stays in scripts/"
+test_case "python3 ./scripts/../scripts/foo.py" allow "E-02: traversal resolves back to scripts/"
+
+echo ""
+echo "=== Security Regression: E-03 Greedy Match Bypass ==="
+test_case "python3 /tmp/evil.py scripts/foo.py" dialog "E-03: evil script before scripts/ arg"
+test_case "python3 /tmp/scripts/evil.py" dialog "NEW-03: arbitrary /tmp/scripts/ directory"
+test_case "python3 /opt/other/scripts/evil.py" dialog "E-03: outside project scripts/"
+
+echo ""
+echo "=== Security Regression: E-04 Dangerous Bash Flags ==="
+test_case "bash --init-file /tmp/evil scripts/foo.sh" dialog "E-04: bash --init-file"
+test_case "bash --rcfile /tmp/evil scripts/foo.sh" dialog "E-04: bash --rcfile"
+test_case "bash -i scripts/foo.sh" dialog "E-04: bash -i interactive"
+
+echo ""
+echo "=== Security Regression: E-05 No-Space Flag Bypass ==="
+test_case 'python3 -c"import os" scripts/x' dialog "E-05: -c no space with code"
+test_case 'python3 -cscripts/foo.py' dialog "E-05: -c masquerade as path"
+test_case 'python3 -mhttp.server scripts/x' dialog "E-05: -m no space"
+test_case 'python3 -e"import os" scripts/x' dialog "E-05: -e no space"
+test_case "python3 --command code scripts/x" dialog "E-05: --command long form"
+test_case "python3 --eval code scripts/x" dialog "E-05: --eval long form"
+
+echo ""
+echo "=== Security Regression: E-06 Variable Expansion ==="
+test_case 'python3 scripts/$EVIL.py' dialog "E-06: dollar variable in path"
+test_case 'python3 scripts/${EVIL}.py' dialog "E-06: brace variable in path"
+test_case 'python3 scripts/$[1+1].py' dialog "E-06: arithmetic expansion"
+
+echo ""
+echo "=== Security Regression: E-07 Substring Match ==="
+test_case "python3 evil_scripts/payload.py" dialog "E-07: evil_scripts/ directory"
+test_case "python3 myscripts/foo.py" dialog "E-07: myscripts/ directory"
+test_case "python3 notscripts/foo.py" dialog "E-07: notscripts/ directory"
+
+echo ""
+echo "=== Security Regression: E-08 tool_name Check ==="
+test_case_raw '{"tool_input":{"command":"python3 scripts/foo.py"},"tool_name":"Write","hook_event_name":"PermissionRequest"}' dialog "E-08: tool_name=Write"
+test_case_raw '{"tool_input":{"command":"python3 scripts/foo.py"},"tool_name":"","hook_event_name":"PermissionRequest"}' dialog "E-08: tool_name empty"
+test_case_raw '{"tool_input":{"command":"python3 scripts/foo.py"},"hook_event_name":"PermissionRequest"}' dialog "E-08: tool_name missing"
+
+echo ""
+echo "=== Extended Safe Flags ==="
+test_case "python3 -u -B scripts/test.py" allow "multi-flag: -u -B"
+test_case "python3 -s scripts/test.py" allow "python3 -s flag"
+test_case "python3 -v scripts/test.py" allow "python3 -v flag"
+
+echo ""
+echo "=== Security Review: Tilde Expansion ==="
+test_case "python3 ~/scripts/foo.py" dialog "tilde home expansion"
+test_case "python3 ~root/scripts/foo.py" dialog "tilde user expansion"
+test_case "python3 ~+/scripts/foo.py" dialog "tilde PWD expansion"
+
+echo ""
+echo "=== Security Review: Glob Characters ==="
+test_case "python3 scripts/*.py" dialog "glob wildcard"
+test_case "python3 scripts/?.py" dialog "glob single-char wildcard"
+test_case 'python3 scripts/{a,b}.py' dialog "brace expansion"
+
+echo ""
+echo "=== Path Normalization ==="
+test_case "python3 ./scripts/foo.py" allow "dotslash normalization"
+test_case "python3 scripts/./foo.py" allow "mid-path dot normalization"
+test_case "python3 scripts/subdir/../foo.py" allow "mid-path traversal resolves in scripts/"
 
 echo ""
 echo "=== RESULTS ==="

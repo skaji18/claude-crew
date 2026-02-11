@@ -6,6 +6,10 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **permission-fallback.sh rewrite** — replaced regex-based guards with 6-phase structured validation pipeline (sanitize → pre-parse → parse → normalize options → normalize path → judge); adds defenses against null byte injection, path traversal, tilde/glob expansion, no-space flag bypass, and tool_name spoofing
+- **permission-fallback tests expanded** — added `test_case_raw` helper and security regression tests covering all identified attack vectors (newline/CR injection, path traversal, greedy match, dangerous bash flags, variable expansion, substring match, tool_name check)
+
 ## [0.8.0] - 2026-02-11
 
 ### Changed

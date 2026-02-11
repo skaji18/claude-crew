@@ -1,47 +1,227 @@
 #!/bin/bash
 # .claude/hooks/permission-fallback.sh
 #
-# PermissionRequest フォールバック:
+# PermissionRequest fallback:
 # settings.json の glob でカバーしきれないスクリプト実行を自動承認する。
 #
 # 前提: このスクリプトに到達する = settings.json の deny を通過済み
-# 目的: python3/bash/sh 経由のスクリプト実行（パス形式不問）を allow する
+# 目的: python3/bash/sh 経由の scripts/ 配下スクリプト実行を allow する
+#
+# 設計原則: 「入力を正規化してから判定」
+#   1. 制御文字を拒否 (sanitize)
+#   2. tool_name を検証
+#   3. 危険なシェル構文を拒否 (compound commands, redirections, etc.)
+#   4. コマンドをパースして interpreter / options / script_path に分離
+#   5. オプションを正規化して危険フラグを拒否
+#   6. パスを正規化して scripts/ 配下かを判定
 
 set -euo pipefail
 
-# jq dependency check — fail closed (show dialog) if unavailable
+# --- Fail closed: jq required ---
 command -v jq >/dev/null 2>&1 || exit 0
 
+# --- Read input ---
 INPUT=$(cat)
-COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
+
+# Guard S0: Reject null bytes in raw input (before jq processing).
+# Bash command substitution strips null bytes, so [[:cntrl:]] check would miss them.
+# Null bytes in JSON (\u0000) get converted by jq to real 0x00, then bash strips them,
+# causing adjacent strings to concatenate and potentially bypass path checks.
+if printf '%s' "$INPUT" | grep -qP '\x00' 2>/dev/null; then
+  exit 0
+fi
+# Also reject JSON-encoded null (\u0000) in the raw JSON string before jq processes it.
+if printf '%s' "$INPUT" | grep -q '\\u0000' 2>/dev/null; then
+  exit 0
+fi
+
+COMMAND=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty')
 [ -z "$COMMAND" ] && exit 0
 
+# --- Helper: allow decision ---
 allow() {
-  cat <<EOF
-{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}
-EOF
+  printf '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}\n'
   exit 0
 }
 
-# Guard 1: Compound commands (shell operators + logical operators)
-[[ "$COMMAND" =~ [\;\|\&\`\>\<] ]] && exit 0
-[[ "$COMMAND" =~ \$\( ]]            && exit 0
-[[ "$COMMAND" =~ \|\| ]]            && exit 0
-[[ "$COMMAND" =~ \&\& ]]            && exit 0
+# =======================================================
+# Phase 1: Sanitize — reject malformed input
+# =======================================================
 
-# Guard 2: Inline code execution (all common interpreters + flag variants)
-[[ "$COMMAND" =~ ^(python3?|bash|sh)\ +(--?c(ommand)?|--?e(val)?|--?m)\  ]] && exit 0
+# Guard S1: Control characters (newline, CR, null, tabs, etc.)
+# These can break regex guards and enable injection.
+# [[:cntrl:]] matches all control characters (0x00-0x1F, 0x7F).
+if [[ "$COMMAND" =~ [[:cntrl:]] ]]; then
+  exit 0
+fi
 
-# Guard 3: Redirection and process substitution
-[[ "$COMMAND" =~ \<\< ]] && exit 0
-[[ "$COMMAND" =~ \<\( ]] && exit 0
-[[ "$COMMAND" =~ \>\( ]] && exit 0
+# Guard S2: tool_name must be "Bash"
+TOOL_NAME=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty')
+[[ "$TOOL_NAME" != "Bash" ]] && exit 0
 
-# Guard 4: Environment variable assignment prefix
+# =======================================================
+# Phase 2: Reject dangerous shell syntax (pre-parse)
+# =======================================================
+
+# Guard P1: Shell operators — compound commands, pipes, backgrounding
+[[ "$COMMAND" =~ [\;\|\&\`] ]] && exit 0
+
+# Guard P2: Redirections and process substitution
+[[ "$COMMAND" =~ [\>\<] ]] && exit 0
+
+# Guard P3: Command substitution $( ... )
+[[ "$COMMAND" =~ \$\( ]] && exit 0
+
+# Guard P4: Variable/arithmetic expansion ($VAR, ${VAR}, $[arith])
+[[ "$COMMAND" =~ \$[A-Za-z_{[:digit:]\[] ]] && exit 0
+
+# Guard P5: Environment variable assignment prefix (VAR=value cmd)
 [[ "$COMMAND" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] && exit 0
 
-# Allow: Interpreter + scripts/ path (python3, bash, sh)
-[[ "$COMMAND" =~ ^(python3|bash|sh)\ +.*scripts/ ]] && allow
+# Guard P6: Tilde expansion (~ at start of a word creates semantic gap:
+# hook sees literal ~, but shell expands to $HOME)
+[[ "$COMMAND" =~ (^|\ )~ ]] && exit 0
 
-# Default: Show permission dialog
+# Guard P7: Glob/brace expansion characters (hook checks literal path,
+# but shell expands globs before execution)
+[[ "$COMMAND" =~ [\*\?\[\{] ]] && exit 0
+
+# =======================================================
+# Phase 3: Parse command into structured components
+# =======================================================
+
+# Split command into words
+read -ra WORDS <<< "$COMMAND"
+[[ ${#WORDS[@]} -lt 1 ]] && exit 0
+
+INTERPRETER="${WORDS[0]}"
+
+# Only allow known interpreters
+case "$INTERPRETER" in
+  python3|bash|sh) ;;
+  *) exit 0 ;;
+esac
+
+# =======================================================
+# Phase 4: Normalize options — classify each word
+# =======================================================
+
+# Walk through words after the interpreter.
+# Categorize as: safe-flag, dangerous-flag, or positional-arg (script path).
+#
+# Dangerous flags (must reject):
+#   python3: -c, -e, -m, --command, --eval (with or without space before value)
+#   bash/sh: -c, --init-file, --rcfile, -i
+#
+# Safe single-char flags (allow and skip):
+#   python3: -u, -B, -s, -S, -v, -b, -q, -O, -I, -E, -P, -R, -W*, -X*
+#   bash/sh: (none that we auto-allow; safest to be conservative)
+#
+# Strategy for flags attached to values (e.g., -c"code", -mmodule):
+#   If a word starts with a known dangerous flag prefix, reject.
+
+SCRIPT_PATH=""
+IDX=1
+
+while [[ $IDX -lt ${#WORDS[@]} ]]; do
+  WORD="${WORDS[$IDX]}"
+
+  if [[ "$WORD" == -* ]]; then
+    # --- Option word ---
+
+    # Dangerous flags: exact match or prefix match (handles -c"code", -mmod)
+    case "$WORD" in
+      # Exact matches for flags that take a following argument
+      -c|--command|-e|--eval|-m)
+        exit 0
+        ;;
+      # Prefix matches: -c"code", -ccode, -mmodule, -e"code"
+      -c*|-e*|-m*)
+        # Distinguish from safe single-char flags like -B, -u
+        # -c, -e, -m followed by more chars = dangerous (value attached)
+        # But single-char flags like -B are exactly 2 chars and not -c/-e/-m
+        exit 0
+        ;;
+      # Bash-specific dangerous flags
+      --init-file|--rcfile|-i)
+        [[ "$INTERPRETER" == "bash" || "$INTERPRETER" == "sh" ]] && exit 0
+        ;;
+    esac
+
+    # Safe single-char flags for python3 (exactly 2 chars: dash + letter)
+    if [[ "$INTERPRETER" == "python3" && ${#WORD} -eq 2 ]]; then
+      case "$WORD" in
+        -u|-B|-s|-S|-v|-b|-q|-O|-I|-E|-P|-R)
+          # Known safe python3 flags — skip
+          ((IDX++))
+          continue
+          ;;
+      esac
+    fi
+
+    # Unknown flag — fail closed (show dialog)
+    exit 0
+  else
+    # --- Positional argument = script path ---
+    SCRIPT_PATH="$WORD"
+    break
+  fi
+
+  ((IDX++))
+done
+
+# No script path found
+[[ -z "$SCRIPT_PATH" ]] && exit 0
+
+# =======================================================
+# Phase 5: Normalize path — resolve to absolute, then check
+# =======================================================
+
+# Determine project directory.
+# CLAUDE_PROJECT_DIR is set by Claude Code when invoking hooks.
+# Fallback: script's own location (two levels up from .claude/hooks/).
+if [[ -n "${CLAUDE_PROJECT_DIR:-}" ]]; then
+  PROJECT_DIR="$CLAUDE_PROJECT_DIR"
+else
+  PROJECT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+fi
+
+# Normalize the script path to absolute using realpath -m (--canonicalize-missing).
+# This resolves .., ., symlinks, and produces a clean absolute path
+# even if the file doesn't exist.
+if [[ "$SCRIPT_PATH" == /* ]]; then
+  # Already absolute
+  ABS_PATH=$(realpath -m "$SCRIPT_PATH" 2>/dev/null) || exit 0
+else
+  # Relative to project directory
+  ABS_PATH=$(realpath -m "$PROJECT_DIR/$SCRIPT_PATH" 2>/dev/null) || exit 0
+fi
+
+# Safety check: ABS_PATH must be non-empty
+[[ -z "$ABS_PATH" ]] && exit 0
+
+# =======================================================
+# Phase 6: Judge — is the normalized path under scripts/?
+# =======================================================
+
+# The normalized absolute path must:
+# 1. Start with PROJECT_DIR/ (stay within the project)
+# 2. Have a /scripts/ component in the path (the script lives under a scripts/ dir)
+
+# Check 1: Must be under PROJECT_DIR
+[[ "$ABS_PATH" == "$PROJECT_DIR/"* ]] || exit 0
+
+# Get the relative path within the project
+REL_PATH="${ABS_PATH#"$PROJECT_DIR"/}"
+
+# Check 2: Relative path must start with "scripts/" or contain "/scripts/"
+# This correctly handles:
+#   scripts/foo.py                          -> allow
+#   .claude/skills/refine-iteratively/scripts/extract_metadata.py -> allow
+#   evil_scripts/payload.py                 -> reject (no /scripts/ boundary)
+if [[ "$REL_PATH" == scripts/* ]] || [[ "$REL_PATH" == */scripts/* ]]; then
+  allow
+fi
+
+# Default: show permission dialog
 exit 0
