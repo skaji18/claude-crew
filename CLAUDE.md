@@ -8,10 +8,11 @@ Claude Code + Task tool サブエージェントによるマルチエージェ�
 ```
 人間 ←→ 親セッション（パス受け渡し係）
               │
-              ├── Task(分解役)     … フェーズ1
-              ├── Task(実働A-C)   … フェーズ2（並列）
-              ├── Task(集約役)     … フェーズ3
-              └── Task(回顧役)     … フェーズ4
+              ├── Task(分解役)     … Phase 1
+              ├── Task(検証役)     … Phase 1.5 (optional)
+              ├── Task(実働A-C)   … Phase 2（並列）
+              ├── Task(集約役)     … Phase 3
+              └── Task(回顧役)     … Phase 4
 ```
 
 - **2層フラット構成**: 親が全サブエージェントを直接生成・管理。ネスト不可
@@ -85,6 +86,7 @@ Phase 1（decomposer起動）は**原則必須**である。タスクの複雑�
 | 実働（ライティング） | `templates/worker_writer.md` | ドキュメント作成・コンテンツ執筆 |
 | 実働（コーディング） | `templates/worker_coder.md` | コード実装・修正 |
 | 実働（レビュー） | `templates/worker_reviewer.md` | コードレビュー・品質チェック |
+| 実働（カスタム） | `personas/*.md` | ユーザー定義のカスタムペルソナ（オプション） |
 | 集約役 | `templates/aggregator.md` | 複数結果の統合・最終報告作成 |
 | 回顧役 | `templates/retrospector.md` | cmd完了後の分析・改善提案生成 |
 | 分析補助 | `templates/multi_analysis.md` | N観点並列分析フレームワーク（decomposerが参照） |

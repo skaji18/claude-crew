@@ -23,6 +23,10 @@ worker_max_turns: 30
 # Optional: set to null to disable time tracking.
 max_cmd_duration_sec: 1800
 
+# Pre-flight plan validation (Phase 1.5)
+# When true, parent launches a reviewer to validate plan.md before Phase 2
+plan_validation: true
+
 # Retrospect mechanism (Phase 4)
 # Post-mortem & success analysis after cmd completion
 retrospect:
@@ -37,3 +41,11 @@ retrospect:
   memory:
     max_candidates_per_cmd: 5    # Max Memory MCP candidates per cmd (aggregator enforces)
     skill_min_score: 12          # Minimum 3-axis score for skill proposals (max=15)
+
+# Phase-specific custom instructions (optional)
+# Appended to phase prompts when non-empty
+phase_instructions:
+  decompose: ""    # Appended to decomposer prompt
+  execute: ""      # Appended to all worker prompts
+  aggregate: ""    # Appended to aggregator prompt
+  retrospect: ""   # Appended to retrospector prompt

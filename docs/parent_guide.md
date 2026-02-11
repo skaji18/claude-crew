@@ -19,6 +19,8 @@
 
 ### フェーズ1: 分解（Decompose）
 
+**Phase instructions**: If `config.yaml: phase_instructions.decompose` is non-empty, append its content to the decomposer prompt.
+
 1. `work/cmd_xxx/` ディレクトリを作成する（xxxは連番）:
    ```bash
    ./scripts/new_cmd.sh
@@ -35,7 +37,70 @@
 4. 結果: `work/cmd_xxx/plan.md` にタスク分解結果が書かれる
    - 各サブタスクが `work/cmd_xxx/tasks/task_N.md` として生成される
 
+### Phase 1.5: Plan Validation (Optional, W1)
+
+If `config.yaml: plan_validation` is `true`, validate the plan before execution:
+
+#### Step 1: Launch Plan Reviewer
+
+Use Task tool to launch a validation sub-agent:
+- **Persona**: worker_reviewer
+- **Model**: haiku (fast validation, max_turns: 10)
+- **Prompt**:
+  ```
+  TEMPLATE_PATH: templates/worker_reviewer.md
+
+  Review the execution plan against the original request.
+
+  INPUT_FILES:
+  - REQUEST_PATH: {request.md path}
+  - PLAN_PATH: {plan.md path}
+
+  OUTPUT: {work_dir}/plan_review.md
+
+  Your review MUST end with one of:
+  - APPROVE: Plan accurately implements the request
+  - APPROVE-WITH-NOTES: Plan is acceptable but has minor issues (list them)
+  - REJECT: Plan has critical flaws (explain specifically)
+
+  Focus on:
+  - Does the plan address all requirements in the request?
+  - Are task dependencies logical?
+  - Are output paths unambiguous?
+  - Is the scope reasonable (check for scope_warning in plan.md)?
+  ```
+
+#### Step 2: Read Review Result
+
+Read `plan_review.md` and check the final verdict line.
+
+#### Step 3: Decision Logic
+
+- **APPROVE** or **APPROVE-WITH-NOTES**: Proceed to Phase 2
+  - If APPROVE-WITH-NOTES, include notes in execution log metadata
+
+- **REJECT**: Re-run decomposer with feedback (one retry max)
+  1. Append reviewer feedback to request.md (in-memory, not file modification)
+  2. Re-run Phase 1 with augmented request
+  3. Read new plan.md
+  4. Proceed to Phase 2 regardless of second result (no infinite loop)
+
+#### Step 4: Logging
+
+Record in execution_log.yaml:
+```yaml
+plan_validation:
+  enabled: true
+  verdict: "APPROVE" | "APPROVE-WITH-NOTES" | "REJECT"
+  retry_occurred: false | true
+  notes: "reviewer notes if any"
+```
+
+**Important**: If plan_validation is false in config, skip Phase 1.5 entirely and proceed directly to Phase 2.
+
 ### フェーズ2: 実行（Execute）
+
+**Phase instructions**: If `config.yaml: phase_instructions.execute` is non-empty, append its content to all worker prompts.
 
 1. `work/cmd_xxx/plan.md` のタスク一覧を確認する（親はファイルパスだけ確認）
    - 確認する情報: タスク数、各タスクのファイルパス、Depends On列（依存関係）、Persona、Model
@@ -45,14 +110,44 @@
    b. Wave 1 のタスクに依存するタスクを **Wave 2** としてグループ化
    c. 以降、依存元が全て処理済みのタスクを次の Wave にグループ化（全タスク割当まで繰り返し）
 3. **Wave を並列実行する**:
-   - **進捗メッセージ**: Wave 実行開始時にユーザーに通知する
-     - 例: `Wave 1/3 実行中... (タスク3個並列)`
+   - **進捗メッセージ**: Wave 実行開始時にユーザーに通知する（ETA付き）
+     - 例: `Wave 1/3: 3 tasks running (~2 min est.)`
+     - ETA が算出不可の場合: `Wave 1/3: 3 tasks running`
+     - 背景ワーク時: `Wave 1/3: 3 tasks running (background)`
    - 各タスクに対して実働サブエージェントを起動する:
      - テンプレートパス（TEMPLATE_PATH）: `templates/worker_xxx.md` からタスクに適したものを選択
      - 入力パス: `work/cmd_xxx/tasks/task_N.md`
      - 出力パス: `work/cmd_xxx/results/result_N.md`
      - prompt に TEMPLATE_PATH + 入出力パスを含める（テンプレートの内容は含めない）
    - **独立したタスクは1メッセージ内で複数の Task tool 呼び出しを行い並列実行する**
+
+   #### Wave進捗メッセージの ETA 計算
+
+   Wave の推定所要時間を算出する方法:
+
+   1. **stats.sh データが利用可能な場合**（10+ 実行ログ）:
+      - `bash scripts/stats.sh` を実行し、ペルソナ別の平均実行時間を抽出
+      - 現在の Wave に属する各タスクについて、そのペルソナの平均時間を合計
+      - 合計を `config.yaml: max_parallel` で除算し、Wave の推定所要時間を算出
+
+   2. **データ不足の場合**（<10 ログ）:
+      - フォールバック推定値を使用:
+        - researcher: 60秒
+        - writer: 90秒
+        - coder: 120秒
+        - reviewer: 45秒
+      - 各タスクのペルソナで推定値を合計
+      - 合計を `max_parallel` で除算
+
+   3. **人間が読みやすい形式に丸める**:
+      - < 90秒: "~1 min"
+      - 90-150秒: "~2 min"
+      - > 150秒: "~N min" (最も近い分に四捨五入)
+
+   **エッジケース**:
+   - ETA が算出不可（stats データなし、フォールバック不可）: ETA 句を省略、Wave メッセージのみ
+   - 全タスクが background ワークの場合: ETA は省略し、代わりに "(background)" を表示
+
 4. **Wave 完了確認 → 次の Wave へ進む**:
    a. 現在の Wave の全タスクが完了したら、`results/` 内の result_N.md 存在をチェック
    b. 各resultファイルを `./scripts/validate_result.sh RESULT_PATH PERSONA` で検証する:
@@ -117,6 +212,8 @@
 
 ### フェーズ3: 集約（Aggregate）
 
+**Phase instructions**: If `config.yaml: phase_instructions.aggregate` is non-empty, append its content to the aggregator prompt.
+
 1. 集約役サブエージェントを起動する:
    - テンプレートパス（TEMPLATE_PATH）: `templates/aggregator.md`
    - 入力パス（RESULTS_DIR）: `work/cmd_xxx/results/`
@@ -129,6 +226,8 @@
 4. Memory MCP 候補は report.md に記録されたまま保持する（Phase 4 完了後に一括提示）
 
 ### フェーズ4: 回顧（Retrospect）
+
+**Phase instructions**: If `config.yaml: phase_instructions.retrospect` is non-empty, append its content to the retrospector prompt.
 
 Phase 3 完了後、cmd の結果を振り返り、失敗からは改善提案を、成功からはスキル化提案を生成する。
 `config.yaml` の `retrospect.enabled` が `false` の場合、Phase 4 を完全スキップする。
@@ -178,6 +277,34 @@ Phase 4 完了後（または Phase 4 スキップ時は Phase 3 完了後）、
 
 ユーザーが一括で承認/却下を判断する。承認された候補のみ処理する:
 
+#### Rejection Memory Storage
+
+When user rejects retrospector proposals:
+
+1. Identify the rejection category:
+   - Template modification proposals → `workflow:rejected_proposal:template_modification`
+   - Skill proposals → `workflow:rejected_proposal:skill`
+   - Improvement proposals → `workflow:rejected_proposal:improvement`
+
+2. Store Memory MCP entity:
+   ```
+   mcp__memory__create_entities({
+     entities: [{
+       name: "workflow:rejected_proposal:{category}",
+       entityType: "rejection_memory",
+       observations: [
+         "Rejected on {date} in {cmd_id}",
+         "Proposal type: {description}",
+         "Reason: {user's stated reason if any}"
+       ]
+     }]
+   })
+   ```
+
+3. This prevents retrospector from repeatedly proposing the same category in future cmds.
+
+**Note**: Rejection memory storage is optional. Only store if the user explicitly rejects a category of proposals (not individual proposals).
+
 - **改善提案**: 承認された各改善に対して以下を実行:
   1. 対象ファイルに変更を適用する
   2. CHANGELOG.md の `## [Unreleased]` に適切なカテゴリ（Added/Changed/Fixed/Deprecated/Removed）でエントリを追加する
@@ -223,6 +350,46 @@ git log --oneline ${BASE_COMMIT}..HEAD
 ```
 
 コミットがない場合（承認された改善が work/ 外のファイルを変更しなかった場合）は表示をスキップする。
+
+## Phase Instructions Injection (F23)
+
+`config.yaml: phase_instructions` に非空の文字列が含まれている場合、対応するフェーズプロンプトに追記する:
+
+### Injection Points
+
+- **Phase 1 (Decompose)**: `phase_instructions.decompose` を decomposer プロンプトの TEMPLATE_PATH 指示の後に追記
+- **Phase 2 (Execute)**: `phase_instructions.execute` を全 worker プロンプトの TEMPLATE_PATH 指示の後に追記
+- **Phase 3 (Aggregate)**: `phase_instructions.aggregate` を aggregator プロンプトの TEMPLATE_PATH 指示の後に追記
+- **Phase 4 (Retrospect)**: `phase_instructions.retrospect` を retrospector プロンプトの TEMPLATE_PATH 指示の後に追記
+
+### Format
+
+追加フェーズ指示は以下の形式で挿入する:
+
+```
+## Instructions
+TEMPLATE_PATH: templates/decomposer.md
+↑ このファイルを最初に Read し、指示に従え。
+
+このフェーズの追加指示:
+{phase_instructions.decompose}
+
+## タスク固有情報
+...
+```
+
+### Use Cases
+
+- プロジェクト固有の制約（例: "vendor/ ディレクトリ内のファイルは絶対に変更しない"）
+- ワークフロー設定（例: "機能実装時は必ずテストファイルも含める"）
+- ドメイン別ガイドライン（例: "docs/standards.md の社内コーディング規約に従う"）
+- セキュリティ要件（例: "API キーが含まれるファイルは絶対に修正しない"）
+
+### 重要な注意
+
+- Phase instructions は**追記される**（テンプレート指示に優先されない）
+- テンプレートの指示がフェーズ指示より優先される
+- 空文字列の場合、追記は行われない
 
 ## 親セッションの行動ルール
 
@@ -529,6 +696,8 @@ Memory MCPに記録する知見は以下の基準を満たすこと:
 **命名規約**: `{domain}:{category}:{identifier}`
 - Good: `security:env_file_exposure_risk`, `user:shogun:preference:report_brevity`
 - Bad: `claude-crew:failure_pattern:result_file_missing` (内部アーキテクチャ)
+
+**Note**: The "Bad" example above is an intentional illustration of the instant-reject filter. Do not use `claude-crew:*` naming in actual Memory MCP entities — it violates the domain-general principle.
 
 **1cmdあたりの候補上限**: `config.yaml: retrospect.memory.max_candidates_per_cmd`（デフォルト: 5件）
 
