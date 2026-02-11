@@ -153,6 +153,19 @@ workerから提案された候補に対し、以下の3ステップで統合・�
 親セッションで人間に確認を求めること。
 ```
 
+## Partial Result Handling
+
+When some tasks failed and their result files are missing or contain `status: failure`:
+- Mark each failed task explicitly: `task_N: failed` in the Completeness table
+- Include `failed_tasks: [N, M]` in the YAML frontmatter (already exists in schema)
+- In the synthesis, clearly note which areas have incomplete coverage due to failed tasks
+- Do NOT fabricate or guess content for failed tasks
+- Set `status: partial` in the report frontmatter if any task failed
+
+When a result file exists but has `status: partial`:
+- Include available content but mark it as incomplete
+- Note the partial status in the Completeness table as `⚠️ partial`
+
 ## Rules
 
 - **YAMLフロントマターのメタデータブロックは絶対必須。** `---` で囲んだYAMLブロックをファイル先頭に配置し、generated_by, date, cmd_id, status, quality, completeness, errors, task_count, failed_tasks を必ず含めよ。全workerのメタデータを集約し、総合評価を記載せよ。

@@ -6,6 +6,21 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-02-11
+
+### Added
+- **F01: `scripts/smoke_test.sh`** — End-to-end smoke test exercising project infrastructure (config validation, health check, directory structure)
+- **F02: `scripts/validate_config.sh`** — Config validation script checking all required fields, types, and value ranges
+- **F05: `scripts/setup.sh`** — Prerequisites check (bash 4+, jq) + health_check.sh + quick-start output
+- **F06: `scripts/stats.sh`** — Execution log parser: duration, persona/model success rates, time trends
+- **F07: Shared notes mechanism** — Workers can share cross-task findings via `WORK_DIR/shared_notes.md` (worker_common.md)
+- **F08: Partial result forwarding** — Aggregator receives partial results with explicit `task_N: failed` markers (parent_guide.md + aggregator.md)
+- **F09: Cascade failure detection** — Parent skips Wave N dependents when Wave N-1 dependency failed (parent_guide.md)
+- **F10: Plan-result reconciliation** — `validate_result.sh --reconcile` checks all planned outputs exist and match
+- **F11: Failure summary output** — Structured failure message at Phase 2 completion (parent_guide.md)
+- **F12: Context hygiene hardening** — Parent records only pass/fail, terse progress messages (parent_guide.md)
+- **F13: Execution time config** — `max_cmd_duration_sec` field in config.yaml; parent warns if exceeded
+
 ### Changed
 - **permission-fallback.sh rewrite** — replaced regex-based guards with 6-phase structured validation pipeline (sanitize → pre-parse → parse → normalize options → normalize path → judge); adds defenses against null byte injection, path traversal, tilde/glob expansion, no-space flag bypass, and tool_name spoofing
 - **permission-fallback.sh direct execution support** — shebang ベースの直接実行（`./scripts/foo.sh`）を自動承認対象に追加; Phase 3 で未知インタプリタをスクリプトパスとして扱い Phase 5-6 のパス検証に委譲

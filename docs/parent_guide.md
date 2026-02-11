@@ -70,9 +70,17 @@
       - 検証結果を execution_log.yaml の該当タスクの `metadata_issues` に記録する（例: `quality missing, defaulted to YELLOW`）
       - 3項目全て存在する場合は検証パス。`metadata_issues` は空リスト `[]` のまま
    e. 欠落またはstatus=failure/partialの場合は該当タスクをリトライ（最大 `config.yaml: max_retries` 回）
-   f. 全resultがstatus=success（またはリトライ上限に達した）ら、次のWaveを並列実行
-   g. **依存元が未完了のタスクは絶対に実行しない**
-   h. 全 Wave が完了するまで繰り返す
+   f. **部分結果の転送**: リトライ上限に達したタスクがある場合:
+      - 該当タスクの result を `status: failure` として記録する（result ファイルが未生成の場合、親が最小限の failure result を生成する）
+      - Phase 3（集約）に進む際、aggregator の prompt に `FAILED_TASKS: [N, M]` を追記する
+      - aggregator はこれらのタスクの結果が欠落していることを前提に統合を行う
+   g. **カスケード障害検出**: Wave N-1 で失敗したタスクに依存する Wave N のタスクがある場合:
+      - 依存元タスクが failure/partial の場合、依存先タスクを自動スキップする
+      - スキップされたタスクは execution_log.yaml に `status: skipped` + `error: "dependency task_M failed"` として記録する
+      - スキップされたタスクの result は生成しない（aggregator に FAILED_TASKS として通知される）
+   h. 全resultがstatus=success（またはリトライ上限に達した）ら、次のWaveを並列実行
+   i. **依存元が未完了のタスクは絶対に実行しない**
+   j. 全 Wave が完了するまで繰り返す
    - **Wave 完了時の進捗メッセージ**: 結果サマリをユーザーに通知する
      - 例: `Wave 1/3 完了 (3/3 success)`
 5. 結果: `work/cmd_xxx/results/result_N.md` に各タスクの成果が書かれる
@@ -89,6 +97,19 @@
       - 各resultを `./scripts/validate_result.sh RESULT_PATH PERSONA` で検証し、メタデータヘッダーで status が "success" であるか
       - 手順4d のメタデータバリデーションを適用し、欠落フィールドにはデフォルト値を付与する
    c. 欠落がある場合: フェーズ2のリトライフローに従い再実行する。上限到達時は欠落を report.md に記録して次フェーズへ進む
+8. **失敗サマリ出力**: Phase 2 完了時に failure/partial タスクが存在する場合、以下の構造化メッセージをユーザーに出力する:
+   ```
+   ⚠️ Phase 2 completed with failures:
+   - Task N ({persona}): {status} — {error summary}
+   - Task M ({persona}): {status} — {error summary}
+   Action: {次のアクション — 再分解/集約続行/手動介入}
+   ```
+   - failure タスクがある場合でも Phase 3 に進む（aggregator が部分結果を統合する）
+   - 50%以上が failure の場合のみフィードバックループを起動する
+9. **実行時間チェック**: `config.yaml: max_cmd_duration_sec` が設定されている場合:
+   - cmd 開始時刻（execution_log.yaml の `started`）からの経過時間を計算する
+   - 閾値を超えた場合、ユーザーに警告を出力する: `⚠️ cmd_NNN has exceeded max duration (${elapsed}s > ${max}s)`
+   - 警告のみ。実行を中断しない
 
 ### フィードバックループ（品質不足時の再分解）
 
@@ -212,6 +233,15 @@ git log --oneline ${BASE_COMMIT}..HEAD
 - サブエージェントの結果は「返り値」ではなく「ファイル」を正データとする
 - フェーズ2完了後は必ずresultファイルの存在確認を行う（リトライはフェーズ2フローに従う）
 
+### コンテキスト衛生
+
+- **Wave完了メッセージ**: pass/fail のステータスとタスク数のみ報告する。validate_result.sh の JSON 出力全文をコンテキストに蓄積しない
+  - Good: `Wave 1/3 完了 (3/3 success)`
+  - Bad: `Wave 1 results: {"complete_marker": true, "line_count": 245, ...}`
+- **result ファイル読み取り制限**: メタデータヘッダー（先頭20行）のみ読む。本文は絶対に読まない
+- **execution_log.yaml 更新**: 各エントリは最小限のフィールドのみ。エラーメッセージは1行以内に要約する
+- **進捗メッセージ**: 定型フォーマットを使い、自由文を避ける
+
 ### やってはいけないこと
 - 「パス受け渡し係」原則に違反すること（ファイル経由で渡せ、コンテキストに読み込むな）
 - 1つのサブエージェントに複数の独立タスクを詰め込むこと（分けて並列にせよ）
@@ -300,6 +330,7 @@ tasks:
 - `partial`: タスクが部分的に完了した（タイムアウト後のリトライ上限到達時など）
 - `failure`: タスクが失敗し、リトライ上限に達した
 - `timeout`: サブエージェントがターン上限（`config.yaml: worker_max_turns`）に到達した
+- `skipped`: タスクの依存元が失敗したため、実行をスキップした
 
 **タイムスタンプフォーマット**:
 - `YYYY-MM-DD HH:MM:SS`（ローカルタイム使用）

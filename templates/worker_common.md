@@ -47,6 +47,10 @@ YAMLブロックの後に続く本文は各workerのペルソナに応じて異�
       type: best_practice / failure_pattern / tech_decision / lesson_learned
       observation: "[What] パターン記述 [Evidence] 根拠 [Scope] 適用条件"
 
+## Shared Notes
+
+If you discover information that would benefit other tasks in the same cmd (e.g., a file structure convention, an API quirk, a dependency constraint), append it to `WORK_DIR/shared_notes.md`. Format: `### Task N: [topic]\n[finding]\n`. Workers should check `shared_notes.md` at task start (if it exists) for relevant context from previously completed tasks. This is optional — only write when genuinely useful cross-task information is discovered. WORK_DIR is the parent of the `tasks/` and `results/` directories (e.g., `work/cmd_044/`).
+
 ## Common Rules
 
 - **YAMLフロントマターのメタデータブロックは絶対必須。** `---` で囲んだYAMLブロックをファイル先頭に配置し、status, quality, completeness, errors, task_id を必ず含めよ。

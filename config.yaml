@@ -1,7 +1,7 @@
 # claude-crew configuration
 
 # Framework version
-version: "0.8.0"
+version: "0.9.0"
 
 # Default model for sub-agents (used when decomposer does not specify)
 default_model: sonnet    # haiku / sonnet / opus
@@ -18,6 +18,10 @@ background_threshold: 5
 # Maximum turns (API round-trips) per sub-agent (maps to Task tool max_turns)
 # Note: Task tool has no time-based timeout; turn count is the only control
 worker_max_turns: 30
+
+# Maximum cmd execution duration (seconds). Warning logged if exceeded.
+# Optional: set to null to disable time tracking.
+max_cmd_duration_sec: 1800
 
 # Retrospect mechanism (Phase 4)
 # Post-mortem & success analysis after cmd completion
