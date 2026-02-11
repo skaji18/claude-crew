@@ -5,6 +5,7 @@
 # 使用法: bash .claude/hooks/test-permission-fallback.sh
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 HOOK="$SCRIPT_DIR/permission-fallback.sh"
 PASS=0; FAIL=0
 
