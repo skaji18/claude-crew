@@ -18,12 +18,13 @@ After reading the request, search Memory MCP for past patterns **before** decomp
 
 ### Search Step
 
-1. Search for past failure patterns and lessons learned:
+1. Search for past failure patterns, anti-patterns, and lessons learned:
    ```
    mcp__memory__search_nodes(query="failure_pattern")
+   mcp__memory__search_nodes(query="antipattern")
    mcp__memory__search_nodes(query="lesson_learned")
    ```
-2. If results are found: review the observations and consider them as constraints or cautions during task decomposition (see "Applying Past Patterns" below)
+2. If results are found: review the observations and consider them as constraints or cautions during task decomposition (see "Applying Past Patterns" and "Anti-Pattern Awareness" sections below)
 3. If no results are found (empty or Memory MCP unavailable): proceed with normal decomposition. Memory is supplementary, not required
 
 ### Entity Naming Convention
@@ -39,6 +40,37 @@ When past patterns are found, incorporate them into task decomposition as follow
 - **best_practice**: Follow documented practices when applicable (e.g., task granularity limits, model selection guidance)
 
 **Important**: Do not over-engineer defenses. Only apply patterns that are directly relevant to the current request. Adding unnecessary constraints or excessive validation steps violates the principle of keeping tasks simple and independent.
+
+### Anti-Pattern Awareness
+
+After searching Memory MCP, if `antipattern:*` entities are found, apply them during task decomposition:
+
+1. Review each anti-pattern's observations for relevant mitigation strategies
+2. When planning tasks that match the anti-pattern context:
+   - Apply the recommended mitigation (e.g., explicit output paths, dependency ordering)
+   - Note in task Details section: "Addresses antipattern:{identifier}"
+3. If the current request is similar to a documented anti-pattern case, adjust the plan structure
+
+**Example**: If `antipattern:dependency:file-creation-before-modification` exists and the request involves creating then modifying files, ensure creation tasks explicitly depend on prerequisite tasks.
+
+**Principle**: Anti-patterns are lessons learned. Apply them proactively, but do not over-engineer defenses for unrelated patterns.
+
+### Historical Patterns (W4)
+
+If `patterns.md` exists in the project root, read it before decomposing tasks:
+
+1. Review success rates by persona and model
+2. Check recommended wave sizes and task sequences
+3. Apply recommendations when planning:
+   - Prefer persona+model combinations with high success rates
+   - Use tested task sequences when applicable
+   - Consider wave sizing recommendations
+
+**Conflict Resolution**: If patterns.md recommendations conflict with anti-patterns (W2), anti-patterns take priority. A specific documented failure is stronger evidence than aggregate statistics.
+
+**Example**: If patterns.md says "3 parallel coders works 80% of the time" but `antipattern:dependency:parallel-file-conflict` exists for this codebase, avoid parallel coder tasks on overlapping files.
+
+**Important**: patterns.md is supplementary guidance, not strict rules. Task-specific requirements always take precedence.
 
 ## Output
 
@@ -114,6 +146,18 @@ cmd_id: "cmd_NNN"                       # command ID (required)
 - The plan.md Tasks table MUST include an Output column specifying each task's result file path.
 - Do not create integration, compilation, or summary tasks. The aggregator agent handles result synthesis. Your job is decomposition only.
 - Each task's RESULT_PATH MUST follow the `results/result_N.md` pattern (N = task number). Do not use custom filenames like `final_report.md`.
+
+## Custom Persona Discovery
+
+Before applying the standard persona selection rules, check if custom persona templates exist:
+
+1. If `personas/*.md` files exist in the project root, read their filenames
+2. Each custom persona file should follow the naming pattern: `personas/worker_*.md`
+3. Custom personas are available alongside standard personas (researcher, writer, coder, reviewer)
+4. When a task matches a custom persona better than standard personas, reference it in the plan
+5. Custom persona format: same structure as standard worker templates (see `templates/worker_*.md`)
+
+**Important**: Custom personas are optional. If `personas/` is empty or does not exist, proceed with standard personas only.
 
 ## Persona Selection Guide — Auto-Selection Rules
 
@@ -261,6 +305,67 @@ Request: "Evaluate cloud providers for our migration"
 → Wave 1: Tasks 1–5 (all parallel)
 → Aggregator synthesizes cross-viewpoint findings and resolves contradictions
 
+## Scope Assessment
+
+After generating all tasks, estimate the overall scope to warn when a request may exceed reliable single-cmd boundaries.
+
+### Assessment Steps
+
+1. **Total files to modify**: Count unique file paths across all task Output, Details, and Input sections
+2. **Estimated LOC changes**: Sum LOC estimates from task descriptions (if quantified). If not quantified, estimate:
+   - Small tasks: 50-200 LOC
+   - Medium tasks: 200-500 LOC
+   - Large tasks: 500+ LOC
+3. **Cross-file dependencies**: Count task pairs that modify overlapping files or reference the same output target
+
+### Threshold Checks
+
+When generating the plan, apply these checks:
+
+- **>10 files**: Large-scale refactoring or multi-module changes
+- **>1000 LOC**: Extensive implementation beyond single-cmd scope
+- **>5 cross-file dependencies**: High coupling risk, potential merge conflicts
+
+### Warning Action
+
+If **ANY** threshold is exceeded, take both actions:
+
+1. **Add to plan.md YAML frontmatter**: Include a `scope_warning` field with a short description
+2. **Add a "## Scope Warning" section** after the Execution Order section
+
+**YAML Frontmatter Example** (when thresholds are exceeded):
+
+```yaml
+---
+generated_by: "claude-crew v0.9.0"
+date: "2026-02-11"
+cmd_id: "cmd_045"
+scope_warning: "Large-scale refactoring affecting 12 files with 1200+ LOC changes and 6 cross-file dependencies"
+---
+```
+
+**Scope Warning Section Example** (added after Execution Order):
+
+```markdown
+## Scope Warning
+
+This request exceeds recommended scope for a single cmd:
+- **Estimated files**: 12 (threshold: 10)
+- **Estimated LOC**: 1200+ (threshold: 1000)
+- **Cross-file dependencies**: 6 (threshold: 5)
+
+**Recommendation**: Consider splitting into sequential cmds:
+1. **Cmd 1**: [Phase A description — which modules or files]
+2. **Cmd 2**: [Phase B description — which modules or files]
+3. **Cmd 3**: [Phase C description — which modules or files]
+
+Splitting reduces merge conflict risk and improves per-cmd quality by narrowing scope.
+```
+
+### When NOT to Add Warning
+
+If all three metrics are within thresholds, omit both the YAML `scope_warning` field and the Scope Warning section.
+
 ## Self-Check（分解完了後に必ず実行）
 
 plan.md と tasks/ を書き終えた後、以下のチェックリストで自己レビューせよ。
@@ -277,6 +382,7 @@ plan.md と tasks/ を書き終えた後、以下のチェックリストで自�
 - [ ] **タスク数上限**: タスク数がmax_parallel(config.yaml参照)を大幅に超えていないか
 - [ ] **Persona選択適正**: `worker_default` を使用していないか。全タスクが specialized persona (researcher/writer/coder/reviewer) であるか
 - [ ] **Model cost-optimality**: No task with Complexity Score ≤ 3 uses sonnet/opus. No task with Complexity Score ≥ 7 uses haiku.
+- [ ] **Scope Assessment**: 推定ファイル数、LOC変更量、クロスファイル依存数を計算し、閾値超過時は scope_warning を YAML フロントマターと Scope Warning セクションに記載したか
 
 ### Self-Check結果の記録
 全項目チェック後、plan.md 末尾に以下を追記せよ:

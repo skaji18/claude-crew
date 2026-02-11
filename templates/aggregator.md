@@ -22,17 +22,24 @@ The parent provides:
    - **Input validation**: If `PLAN_PATH` is missing/empty or `RESULTS_DIR` contains no result files, write `status: failure` to `REPORT_PATH` with error details, then stop.
 4. Evaluate completeness: were all planned tasks completed?
 5. Synthesize findings into a unified report
-6. Collect Memory MCP candidates: check each result file for a `## Memory MCP追加候補` section. If found, gather all candidates and include a `## Memory MCP追加候補（統合）` section in the report (grouped by worker). If no candidates exist, write `Memory MCP追加候補: なし`
-7. Quality Review: cross-check all result files for quality issues:
+6. **Conflict Detection & Resolution**: After synthesizing all worker results, explicitly check for contradictions:
+   - Scan for: opposing recommendations, conflicting data, incompatible implementations
+   - Classify each contradiction as **COSMETIC** (wording difference, same conclusion) or **FUNDAMENTAL** (opposing recommendations)
+   - For COSMETIC conflicts: note in synthesis, no quality impact
+   - For FUNDAMENTAL conflicts: state which result has stronger evidence and cite it. If evidence is equal, add to report_summary.md YAML frontmatter: `conflicts: ["Worker X vs Worker Y: description"]`
+   - Quality impact: any FUNDAMENTAL conflict → minimum quality YELLOW. Unresolvable → YELLOW with resolution recommendation
+   - When processing partial results (F08): do NOT flag missing perspectives as conflicts. Note incomplete coverage due to failed tasks instead.
+7. Collect Memory MCP candidates: check each result file for a `## Memory MCP追加候補` section. If found, gather all candidates and include a `## Memory MCP追加候補（統合）` section in the report (grouped by worker). If no candidates exist, write `Memory MCP追加候補: なし`
+8. Quality Review: cross-check all result files for quality issues:
    - **Consistency**: Do results contradict each other in numbers, terms, or conclusions?
    - **Evidence**: Are claims backed by sources or verified file references? Flag unverified assertions.
    - **Task compliance**: Does each result_N.md address the requirements in its corresponding task_N.md?
    Assign a Quality Level: GREEN (no issues), YELLOW (MAJOR or below), RED (CRITICAL issues found).
-8. Write the report to `REPORT_PATH`. Include version metadata as fields in the YAML frontmatter:
+9. Write the report to `REPORT_PATH`. Include version metadata as fields in the YAML frontmatter:
    - `generated_by`: `"claude-crew v{version}"` (`{version}` from `config.yaml`)
    - `date`: current date (`YYYY-MM-DD`)
    - `cmd_id`: extracted from the work directory name (e.g., `cmd_001`)
-9. Write the summary to `REPORT_SUMMARY_PATH` (≤50 lines). Format:
+10. Write the summary to `REPORT_SUMMARY_PATH` (≤50 lines). Format:
    ```markdown
    ---
    (same YAML frontmatter as report.md)
@@ -51,7 +58,7 @@ The parent provides:
    ## Memory MCP Candidates
    - 候補数: N件（詳細は report.md を参照）
    ```
-10. Verify both report files exist (use Glob or ls on `REPORT_PATH` and `REPORT_SUMMARY_PATH`). If not found, retry Write
+11. Verify both report files exist (use Glob or ls on `REPORT_PATH` and `REPORT_SUMMARY_PATH`). If not found, retry Write
 
 ## Output Format
 
@@ -71,6 +78,7 @@ output_files:            # list of generated files
   - report.md
 task_count: N            # number of processed tasks (required)
 failed_tasks: []         # list of failed task IDs (required)
+conflicts: []            # unresolvable contradictions (F17, optional, empty if none)
 ---
 
 # Report: [Project/Command Name]
@@ -105,6 +113,28 @@ failed_tasks: []         # list of failed task IDs (required)
 
 ## Recommendations
 - [Next steps or follow-up actions]
+
+## Conflict Detection & Resolution
+
+### Contradictions Found
+
+[List each contradiction identified across worker results]
+
+- **Type**: COSMETIC / FUNDAMENTAL
+- **Description**: [What contradicts?]
+- **Evidence**: [Which worker result supports each side? Cite evidence.]
+- **Resolution**: [For COSMETIC: how unified wording was chosen. For FUNDAMENTAL: which result has stronger evidence and why. For unresolvable: documented in YAML frontmatter below.]
+
+[If no contradictions found, write: "No contradictions detected across worker results."]
+
+### Partial Result Impact (F08)
+
+[If any tasks failed]:
+- **Failed tasks**: task_N, task_M
+- **Topics with incomplete coverage**: [Which topics were affected?]
+- **Preliminary findings**: [Mark findings in incomplete areas as "preliminary pending task_N completion"]
+
+[If all tasks completed, write: "All planned tasks completed; full coverage achieved."]
 
 ## Quality Review
 **Quality Level**: GREEN / YELLOW / RED

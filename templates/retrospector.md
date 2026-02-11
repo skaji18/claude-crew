@@ -29,12 +29,14 @@ mcp__memory__search_nodes(query="failure_pattern")
 mcp__memory__search_nodes(query="best_practice")
 mcp__memory__search_nodes(query="lesson_learned")
 mcp__memory__search_nodes(query="tech_decision")
+mcp__memory__search_nodes(query="workflow:rejected_proposal")
 ```
 
 Note any patterns found — they will be used for:
 - Accurately scoring the `recurrence` dimension
 - Excluding duplicate proposals (qualitative filter)
 - Trend analysis (Step 12)
+- Filtering proposals based on rejection memory (Step 13)
 
 If Memory MCP is empty or returns no results, proceed normally.
 
@@ -151,7 +153,26 @@ Classify successes into these 6 categories:
 
 Generate skill/template proposals based on success analysis. Each proposal follows the format defined in the Proposal Format section.
 
-### Step 9: Score All Proposals
+### Step 9: Extract Failure Signatures (full mode only)
+
+**Skip this step if MODE is "light".**
+
+For each failed/partial task analyzed in Step 5:
+1. Extract the failure signature as defined in the "Failure Signature Extraction" section
+2. Determine if the failure pattern is generalizable (likely to recur in different cmds)
+3. If generalizable, propose an anti-pattern Memory MCP entity following the format in that section
+
+### Step 10: Check Rejection Memory
+
+Search for past rejected proposals (already retrieved in Step 1):
+
+```
+mcp__memory__search_nodes(query="workflow:rejected_proposal")
+```
+
+If results found, identify rejected categories and filter your proposals accordingly. Record how many proposals were filtered in the retrospective output.
+
+### Step 11: Score All Proposals
 
 Apply the 4-criteria scoring system to every proposal (both improvement and skill proposals).
 
@@ -179,7 +200,7 @@ Apply the 4-criteria scoring system to every proposal (both improvement and skil
 total = recurrence * 0.30 + impact * 0.30 + generality * 0.20 + feasibility * 0.20
 ```
 
-### Step 10: Filter Proposals
+### Step 12: Filter Proposals
 
 #### Quantitative Filter (Threshold)
 
@@ -211,15 +232,57 @@ After filtering, enforce maximum counts:
 
 If more proposals pass the filter than the limit allows, keep the highest-scoring ones.
 
-### Step 11: Generate retrospective.md
+### Step 13: Generate retrospective.md
 
 Write the output to `RETROSPECTIVE_PATH` following the Output Format defined below.
 
-### Step 12: Extract Memory MCP Candidates and Trend Analysis
+### Step 14: Extract Memory MCP Candidates and Trend Analysis
 
 #### Memory MCP追加候補
 
 From the analysis, extract **domain knowledge and reusable principles** worth persisting in Memory MCP.
+
+## Failure Signature Extraction (Full Mode Only)
+
+When operating in full mode (cmd had failures or partial results), extract failure signatures:
+
+### For Each Failed Task
+
+Analyze the task result and extract:
+1. **Task type**: Which persona was assigned (researcher/writer/coder/reviewer)
+2. **Error pattern**: Classify failure cause in 1 sentence
+   - Examples: "file-creation-before-modification", "ambiguous-output-path", "circular-dependency", "scope-underestimation"
+3. **Request characteristics**: What about the request contributed to this failure
+   - Examples: "multi-step refactoring", "complex file dependency", "novel tool usage"
+
+### Anti-Pattern Memory MCP Format
+
+For significant failure patterns (not one-off errors), propose Memory MCP candidate:
+
+- **Entity name**: `antipattern:{category}:{identifier}`
+  - Examples: `antipattern:dependency:file-creation-before-modification`, `antipattern:scope:underestimated-loc-count`
+- **Entity type**: "anti_pattern"
+- **Observations**:
+  - Failure signature (task type, error pattern, cmd_id)
+  - Root cause analysis
+  - Recommended decomposer mitigation
+
+**Important**: Only propose anti-patterns that are generalizable (likely to recur). Single-instance bugs do not qualify.
+
+## Rejection Memory Check
+
+Before generating proposals, search for past rejected proposals:
+
+```
+mcp__memory__search_nodes(query="workflow:rejected_proposal")
+```
+
+If results found:
+- Review rejection categories (e.g., "template_modification_too_abstract", "skill_too_project_specific")
+- Avoid generating proposals in rejected categories
+- Note in your output: "Filtered N proposals based on rejection memory"
+
+This prevents repeatedly proposing the same type of improvement the user has already rejected.
 
 ##### 即却下フィルタ（候補生成前に必ず確認）
 
@@ -252,6 +315,8 @@ Bad (reject):
   claude-crew:failure_pattern:result_file_missing  -- 内部アーキテクチャ
   cmd_030:security:env_protection                  -- cmd固有スコープ
 ```
+
+**Note**: These "Bad" examples are intentional illustrations of the instant-reject filter. Do not use `claude-crew:*` or `cmd_NNN:*` naming in actual Memory MCP entities — they violate the domain-general and cross-cmd principles.
 
 ##### Observation品質基準
 
