@@ -16,6 +16,17 @@ echo "✓ jq installed"
 command -v git >/dev/null 2>&1 || { echo "✗ git not found"; exit 1; }
 echo "✓ git installed"
 
+# Check Memory MCP connection (optional feature)
+if command -v claude >/dev/null 2>&1; then
+  if claude mcp list 2>/dev/null | grep -q "memory:.*✓ Connected"; then
+    echo "✓ Memory MCP connected"
+  else
+    echo "⚠ Memory MCP not connected (optional feature)"
+  fi
+else
+  echo "⚠ Memory MCP check skipped (claude command not found — optional feature)"
+fi
+
 echo
 bash "$PROJECT_ROOT/scripts/validate_config.sh" || { echo "✗ Config validation failed"; exit 1; }
 echo
