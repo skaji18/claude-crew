@@ -5,10 +5,7 @@
       "Write", "Edit",
       "Bash(git *)",
       "Bash(gh *)",
-      "Bash(ls*)", "Bash(pwd)", "Bash(mkdir *)", "Bash(date*)",
-      "Bash(wc *)", "Bash(tail *)", "Bash(head *)", "Bash(grep *)",
-      "Bash(cat *)", "Bash(sort *)", "Bash(which *)", "Bash(touch *)",
-      "Bash(cp *)", "Bash(mv *)", "Bash(diff *)"
+      "Bash(ls*)", "Bash(grep *)"
     ],
     "ask": [
       "Bash(git*push*)",

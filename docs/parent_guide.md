@@ -648,7 +648,13 @@ Bash tool 呼び出し
     ↓ not matched
 [Tier 2] settings.json allow → 自動許可
     ↓ not matched
-[Tier 3] PermissionRequest hook → scripts/ or .claude/hooks/ なら自動許可
+[Tier 3] PermissionRequest hook
+    ├── Phase 1-2: シェル構文ガード → 拒否
+    ├── Phase 3-6: scripts/ or .claude/hooks/ → 自動許可
+    └── Phase 7: 汎用コマンド承認
+        ├── ALWAYS_ASK リスト一致 → 確認ダイアログ
+        ├── パス引数がプロジェクト外 → 確認ダイアログ
+        └── それ以外 → 自動許可
     ↓ not matched
 [Tier 4] settings.json ask → 条件付き確認
     ↓ not matched
@@ -665,13 +671,14 @@ deny > allow > hook > ask > default の優先順位で判定される。hookは 
 |-------------|---------|
 | Git 全般（status, diff, log, add, commit 等） | 自動許可（allow: `git *`） |
 | GitHub CLI | 自動許可（allow: `gh *`） |
-| Bash ユーティリティ（ls, pwd, mkdir, date, wc, tail, head, grep, cat, sort, which, touch, cp, mv, diff） | 自動許可（allow リスト） |
-| スクリプト実行（scripts/ 配下・.claude/hooks/ 配下） | hook経由で自動許可（PermissionRequest hook が6段階検証後に承認。詳細は `.claude/hooks/permission-fallback.sh` 参照） |
+| Bash 基本ユーティリティ（ls, grep） | 自動許可（allow リスト） |
+| スクリプト実行（scripts/ 配下・.claude/hooks/ 配下） | hook Phase 3-6 経由で自動許可（詳細は `.claude/hooks/permission-fallback.sh` 参照） |
+| Phase 7 汎用コマンド（プロジェクト内） | hook Phase 7 経由で自動許可（find, cat, wc, stat, tree 等のプロジェクト内ファイル操作） |
+| Phase 7 ALWAYS_ASK（ネットワーク・権限昇格・インタプリタ） | 毎回確認（curl, sudo, npm, node 等。詳細は hook の ALWAYS_ASK リスト参照） |
 | ファイル操作ツール（Read, Glob, Grep） | 自動許可（allow リスト） |
 | ファイル書き込み（Edit, Write） | 自動許可（allow リスト） |
 | Git push（force push含む） | 毎回確認（ask: `git*push*`） |
 | Git 破壊操作（reset --hard, clean -f, checkout ., restore .） | 毎回確認（ask リスト） |
-| HTTP 変更（curl POST/PUT/PATCH） | 毎回確認（ask リスト） |
 | ファイル再帰削除（rm -rf, rm -r） | 自動拒否（deny リスト） |
 | HTTP DELETE（curl -X DELETE） | 自動拒否（deny リスト） |
 | 危険操作（pipe to sh/bash, chmod 777, DROP TABLE 等） | 自動拒否（deny リスト。詳細は `.claude/settings.json` 参照） |
