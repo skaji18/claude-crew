@@ -102,6 +102,104 @@ TOOL_NAME=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty')
 [[ "$TOOL_NAME" != "Bash" ]] && reject "S2:tool_name"
 
 # =======================================================
+# Phase 1.5: Strip safe trailing suffixes (pre-Phase 2)
+# =======================================================
+# Safe suffixes are stripped BEFORE operator guards so that
+# P1/P2 never see the safe operators. The core command
+# then passes through P1-P6 normally.
+
+# --- Regex patterns stored in variables (avoids quoting hell in [[ =~ ]]) ---
+# IMPORTANT: When used as [[ "$X" =~ $RE_VAR ]], do NOT quote $RE_VAR.
+RE_OR_TRUE='^(.+) \|\| true$'
+RE_2_REDIR1='^(.+) 2>&1$'
+RE_2_REDIR_NULL='^(.+) 2>/dev/null$'
+
+# For echo with double-quoted literals: reject $, backtick, (, ), backslash
+# Character class for safe content inside double quotes
+SAFE_DQ='[^$`()\\"]'
+RE_OR_ECHO_DQ="^(.+) \\|\\| echo \"(${SAFE_DQ}*)\"$"
+RE_AND_ECHO_DQ="^(.+) && echo \"(${SAFE_DQ}*)\"$"
+
+# For echo with single-quoted literals: reject only single quotes
+SQ="'"
+RE_OR_ECHO_SQ="^(.+) \\|\\| echo ${SQ}([^${SQ}]*)${SQ}$"
+RE_AND_ECHO_SQ="^(.+) && echo ${SQ}([^${SQ}]*)${SQ}$"
+
+ORIGINAL_COMMAND="$COMMAND"
+SAFE_SUFFIX=""
+
+# Iteratively strip safe suffixes from the end of COMMAND.
+# Loop because suffixes can combine: "2>&1 || true"
+# Process order: strip logical operators first, then stderr redirects
+# (so "2>&1 || true" strips "|| true" first, then "2>&1")
+
+SUFFIX_CHANGED=true
+while $SUFFIX_CHANGED; do
+  SUFFIX_CHANGED=false
+
+  # Strip: || true
+  if [[ "$COMMAND" =~ $RE_OR_TRUE ]]; then
+    COMMAND="${BASH_REMATCH[1]}"
+    SAFE_SUFFIX=" || true${SAFE_SUFFIX}"
+    SUFFIX_CHANGED=true
+    continue
+  fi
+
+  # Strip: || echo "literal" (double-quoted, no expansion chars)
+  if [[ "$COMMAND" =~ $RE_OR_ECHO_DQ ]]; then
+    COMMAND="${BASH_REMATCH[1]}"
+    SAFE_SUFFIX=" || echo \"${BASH_REMATCH[2]}\"${SAFE_SUFFIX}"
+    SUFFIX_CHANGED=true
+    continue
+  fi
+
+  # Strip: || echo 'literal' (single-quoted)
+  if [[ "$COMMAND" =~ $RE_OR_ECHO_SQ ]]; then
+    COMMAND="${BASH_REMATCH[1]}"
+    SAFE_SUFFIX=" || echo '${BASH_REMATCH[2]}'${SAFE_SUFFIX}"
+    SUFFIX_CHANGED=true
+    continue
+  fi
+
+  # Strip: && echo "literal" (double-quoted, no expansion chars)
+  if [[ "$COMMAND" =~ $RE_AND_ECHO_DQ ]]; then
+    COMMAND="${BASH_REMATCH[1]}"
+    SAFE_SUFFIX=" && echo \"${BASH_REMATCH[2]}\"${SAFE_SUFFIX}"
+    SUFFIX_CHANGED=true
+    continue
+  fi
+
+  # Strip: && echo 'literal' (single-quoted)
+  if [[ "$COMMAND" =~ $RE_AND_ECHO_SQ ]]; then
+    COMMAND="${BASH_REMATCH[1]}"
+    SAFE_SUFFIX=" && echo '${BASH_REMATCH[2]}'${SAFE_SUFFIX}"
+    SUFFIX_CHANGED=true
+    continue
+  fi
+
+  # Strip: 2>&1
+  if [[ "$COMMAND" =~ $RE_2_REDIR1 ]]; then
+    COMMAND="${BASH_REMATCH[1]}"
+    SAFE_SUFFIX=" 2>&1${SAFE_SUFFIX}"
+    SUFFIX_CHANGED=true
+    continue
+  fi
+
+  # Strip: 2>/dev/null
+  if [[ "$COMMAND" =~ $RE_2_REDIR_NULL ]]; then
+    COMMAND="${BASH_REMATCH[1]}"
+    SAFE_SUFFIX=" 2>/dev/null${SAFE_SUFFIX}"
+    SUFFIX_CHANGED=true
+    continue
+  fi
+done
+
+# Debug: log what was stripped
+if [[ -n "$SAFE_SUFFIX" && "${PERMISSION_DEBUG:-0}" == "1" ]]; then
+  echo "SUFFIX_STRIPPED[$SAFE_SUFFIX]" >&2
+fi
+
+# =======================================================
 # Phase 2: Reject dangerous shell syntax (pre-parse)
 # =======================================================
 
