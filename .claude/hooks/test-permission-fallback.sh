@@ -6,7 +6,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-HOOK="$SCRIPT_DIR/permission-fallback.sh"
+HOOK="$SCRIPT_DIR/permission-fallback"
 PASS=0; FAIL=0
 
 test_case() {
@@ -14,7 +14,7 @@ test_case() {
   local escaped_cmd="${cmd//\"/\\\"}"
   local input="{\"tool_input\":{\"command\":\"$escaped_cmd\"},\"tool_name\":\"Bash\",\"hook_event_name\":\"PermissionRequest\"}"
   local output
-  output=$(echo "$input" | bash "$HOOK" 2>/dev/null)
+  output=$(echo "$input" | "$HOOK" 2>/dev/null)
 
   if [ "$expected" = "allow" ]; then
     if echo "$output" | jq -e '.hookSpecificOutput.decision.behavior == "allow"' >/dev/null 2>&1; then
@@ -37,7 +37,7 @@ test_case() {
 test_case_raw() {
   local input="$1" expected="$2" desc="$3"
   local output
-  output=$(printf '%s' "$input" | bash "$HOOK" 2>/dev/null)
+  output=$(printf '%s' "$input" | "$HOOK" 2>/dev/null)
 
   if [ "$expected" = "allow" ]; then
     if echo "$output" | jq -e '.hookSpecificOutput.decision.behavior == "allow"' >/dev/null 2>&1; then
@@ -254,6 +254,55 @@ test_case "python3 scripts/foo.py" allow "python3 scripts/foo.py (reconfirm)"
 test_case "bash .claude/hooks/test-permission-fallback.sh" allow "test-permission-fallback.sh (reconfirm)"
 
 echo ""
+echo "=== Phase 7B2: Subcommand Rejection (NEW) ==="
+
+# git subcommands
+test_case "git push" dialog "7B2: git push (no args)"
+test_case "git push origin main" dialog "7B2: git push with args"
+test_case "git push -f origin main" dialog "7B2: git push force"
+test_case "git clean" dialog "7B2: git clean (no flags)"
+test_case "git clean -f" dialog "7B2: git clean -f"
+test_case "git clean -fd" dialog "7B2: git clean -fd"
+test_case "git reset" allow "7B2: git reset (no --hard flag)"
+test_case "git reset HEAD~1" allow "7B2: git reset soft"
+test_case "git reset --hard" dialog "7B2: git reset --hard (no args)"
+test_case "git reset --hard HEAD~1" dialog "7B2: git reset --hard with ref"
+test_case "git reset --hard origin/main" dialog "7B2: git reset --hard remote"
+test_case "git checkout ." dialog "7B2: git checkout . (discard changes)"
+test_case "git checkout main" allow "7B2: git checkout branch (safe)"
+test_case "git checkout -b feature" allow "7B2: git checkout new branch"
+test_case "git restore ." dialog "7B2: git restore . (discard changes)"
+test_case "git restore file.txt" allow "7B2: git restore single file"
+
+# gh subcommands
+test_case "gh pr merge 123" dialog "7B2: gh pr merge"
+test_case "gh pr merge --squash 123" dialog "7B2: gh pr merge squash"
+test_case "gh pr view 123" allow "7B2: gh pr view (safe)"
+test_case "gh pr list" allow "7B2: gh pr list (safe)"
+test_case "gh pr create" allow "7B2: gh pr create (safe)"
+test_case "gh repo delete myrepo" dialog "7B2: gh repo delete"
+test_case "gh repo archive myrepo" dialog "7B2: gh repo archive"
+test_case "gh repo view" allow "7B2: gh repo view (safe)"
+test_case "gh release delete v1.0.0" dialog "7B2: gh release delete"
+test_case "gh release list" allow "7B2: gh release list (safe)"
+
+# Edge cases: subcommand-like strings that should NOT match
+test_case "git status" allow "7B2: git status (not in deny list)"
+test_case "git log" allow "7B2: git log (safe)"
+test_case "git diff" allow "7B2: git diff (safe)"
+test_case "gh api repos/foo/bar" allow "7B2: gh api (safe)"
+test_case "gh issue list" allow "7B2: gh issue (safe)"
+
+# Flag order variations
+test_case "git reset HEAD~1 --hard" dialog "7B2: git reset --hard at end"
+test_case "git --no-pager reset --hard" dialog "7B2: git reset --hard with global flag"
+
+# Substring attack prevention
+test_case "mygit push data" allow "7B2: mygit (not git) should pass Phase 7"
+test_case "/usr/bin/git push" dialog "7B2: absolute path git push"
+test_case "./git push" dialog "7B2: ./git outside scripts/ (direct exec must be in scripts/ or .claude/hooks/)"
+
+echo ""
 echo "=== Security Regression: Missing Coverage (R2) ==="
 
 # TEST-01: Very long path (near PATH_MAX)
@@ -322,7 +371,7 @@ test_case 'bash scripts/foo.sh || echo "$VAR"' dialog "unsafe: echo with $VAR"
 test_case 'bash scripts/foo.sh && echo "${HOME}"' dialog "unsafe: echo with ${HOME}"
 
 # Command substitution in echo strings
-test_case 'bash scripts/foo.sh || echo "$(whoami)"' dialog "unsafe: echo with $(cmd)"
+test_case 'bash scripts/foo.sh || echo "$(whoami)"' dialog 'unsafe: echo with $(cmd)'
 test_case 'bash scripts/foo.sh && echo "`id`"' dialog "unsafe: echo with backtick"
 
 # Backtick in echo

@@ -3,14 +3,13 @@
     "allow": [
       "Read", "Glob", "Grep",
       "Write", "Edit",
-      "Bash(git *)",
-      "Bash(gh *)",
       "Bash(ls*)", "Bash(grep *)"
     ],
     "ask": [
       "Bash(git*push*)",
       "Bash(git*reset --hard*)", "Bash(git*clean -f*)",
       "Bash(git*checkout .)", "Bash(git*restore .)",
+      "Bash(gh pr merge*)", "Bash(gh repo delete*)", "Bash(gh repo archive*)",
       "Bash(curl -X POST*)", "Bash(curl -X PUT*)", "Bash(curl -X PATCH*)"
     ],
     "deny": [
@@ -27,7 +26,7 @@
         "matcher": "Bash",
         "hooks": [{
           "type": "command",
-          "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/permission-fallback.sh",
+          "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/permission-fallback",
           "timeout": 5
         }]
       }
