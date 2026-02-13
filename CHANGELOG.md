@@ -11,6 +11,12 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - **Phase 7 general command auto-approval** — Extended auto-approval mechanism for common commands with path containment validation to streamline permission fallback processing (cmd_048)
 - **Memory MCP connection check in setup.sh** — Added verification of Memory MCP service connectivity during initialization to ensure knowledge graph functionality is available (cmd_049)
 
+### Changed
+- **Wave derivation clarification** — Parent session now derives Wave assignments exclusively from `Depends On` column; `## Execution Order` section treated as reference only (cmd_055)
+- **Decomposer file conflict rules** — File conflicts must be declared as explicit `Depends On` dependencies; implicit Wave-based conflict avoidance is prohibited (cmd_055)
+- **Task granularity optimization** — Added systematic merge/don't-merge criteria and judgment flowchart for decomposer to reduce over-decomposition (cmd_055)
+- **Decomposer Self-Check expansion** — Added 5 checklist items: Execution Order consistency, Wave separation justification, file conflict detection, granularity optimization, over-decomposition check (cmd_055)
+
 ### Fixed
 - **macOS/bash 3.2 compatibility** — Resolved compatibility issues with permission-fallback.sh on macOS systems running bash 3.2 to ensure cross-platform operation (cmd_050)
 

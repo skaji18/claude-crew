@@ -141,6 +141,14 @@ cmd_id: "cmd_NNN"                       # command ID (required)
 - Keep tasks independent where possible to maximize parallelism.
 - Depends On must not contain circular dependencies (e.g., A→B→A).
 - Avoid assigning multiple tasks to write the same file (conflict prevention).
+- `## Execution Order` セクションのWave割り当ては、`Depends On` 列のトポロジカルソートと **厳密に一致** させよ。論理的な実行順序（例: "基盤→応用"）は `Depends On` 列で表現し、`## Execution Order` で独自のWave分割を行ってはならない。ファイル競合でWave分離が必要な場合は、その競合を `Depends On` 列に明示的な依存関係として記載せよ。
+- **ファイル競合の依存関係化**: 複数タスクが同一ファイルを変更する場合、以下のルールに従え:
+  1. 各ファイルについて、変更するタスクを列挙する
+  2. 同一ファイルを変更するタスク群は、**片方のタスクを他方の `Depends On` に追加**して直列化せよ（同一ファイルへの並列書き込みは禁止）
+  3. 依存方向は「編集範囲の小さいタスク → 大きいタスク」を推奨する（小さい変更を先に適用し、大きい変更がマージしやすくする）
+  4. 同一ファイルを変更するタスクが3つ以上ある場合は、チェーン化（A→B→C）ではなく、1つのタスクに統合することを検討せよ
+  5. `## Risks` セクションに「ファイル競合: {ファイル名} — Tasks {N, M} が変更。Task M は Task N 完了後に実行」と記載せよ
+  6. **Waveによる暗黙的な競合回避は禁止**。競合があるなら `Depends On` 列に明示せよ
 - Choose the cheapest model that can handle each task (haiku for simple, sonnet for standard, opus for complex).
 - Each `tasks/task_N.md` Output section MUST specify the concrete result file path (e.g., `work/cmd_xxx/results/result_N.md`). Never leave output paths ambiguous (e.g., "write the result" is insufficient — use the explicit file path).
 - The plan.md Tasks table MUST include an Output column specifying each task's result file path.
@@ -366,6 +374,42 @@ Splitting reduces merge conflict risk and improves per-cmd quality by narrowing 
 
 If all three metrics are within thresholds, omit both the YAML `scope_warning` field and the Scope Warning section.
 
+## Task Granularity Optimization
+
+分解粒度はタスクの独立性と並列実行のバランスで決定せよ。以下のガイドラインに従え。
+
+### 統合すべきパターン（Merge）
+
+以下のいずれかに該当する場合、複数のステップを **1つのタスク** に統合せよ:
+
+1. **同一ペルソナの線形チェーン（3ステップ以下）**: 例: 分析→設計、実装→テスト。中間成果物を他タスクが参照しない場合、1タスクにまとめることでWave間遷移オーバーヘッド（~30sec/遷移）を削減できる
+2. **同一ファイルへの連続変更**: 例: ファイル作成→同ファイルにリンク追加。1タスクにまとめることでファイル競合を根本的に回避できる
+3. **前タスクの出力が「パス」のみで「内容」不要**: 例: ファイルを作成し、そのパスをREADMEに追記。パスは事前に確定しているため、依存待ちは不要
+
+### 統合してはいけないパターン（Do NOT Merge）
+
+以下のいずれかに該当する場合、タスクを統合してはならない:
+
+1. **ペルソナが異なる**: researcher + coder 等の組み合わせ。専門性の低下を避けるため分離を維持せよ
+2. **中間成果物を他タスクが参照する**: 例: 調査結果を実装と文書作成の両方が使う場合、調査タスクは独立させよ
+3. **統合後のタスクが worker_max_turns（config.yaml参照）の80%を超える見込み**: 大タスクはタイムアウトリスクが高い。分離を維持せよ
+
+### 統合判定フロー
+
+```
+線形チェーン A→B→C を発見
+  │
+  ├─ A, B, C が全て同一ペルソナ？
+  │   ├─ YES: 中間成果物(B→C)を他タスクが参照する？
+  │   │   ├─ YES → 分離維持
+  │   │   └─ NO: 統合後の推定ターン数 > max_turns*0.8 ？
+  │   │       ├─ YES → 分離維持
+  │   │       └─ NO → **統合せよ**（A+B+C → 1タスク）
+  │   └─ NO → 分離維持（ペルソナ混在）
+  │
+  └─ 2ステップの場合も同じフローを適用
+```
+
 ## Self-Check（分解完了後に必ず実行）
 
 plan.md と tasks/ を書き終えた後、以下のチェックリストで自己レビューせよ。
@@ -383,6 +427,11 @@ plan.md と tasks/ を書き終えた後、以下のチェックリストで自�
 - [ ] **Persona選択適正**: `worker_default` を使用していないか。全タスクが specialized persona (researcher/writer/coder/reviewer) であるか
 - [ ] **Model cost-optimality**: No task with Complexity Score ≤ 3 uses sonnet/opus. No task with Complexity Score ≥ 7 uses haiku.
 - [ ] **Scope Assessment**: 推定ファイル数、LOC変更量、クロスファイル依存数を計算し、閾値超過時は scope_warning を YAML フロントマターと Scope Warning セクションに記載したか
+- [ ] **Execution Order一致性**: `## Execution Order` のWave割り当てが `Depends On` 列のトポロジカルソートと一致するか。`Depends On: -` のタスクは必ずWave 1に含まれているか
+- [ ] **Wave分離の正当化**: `Depends On: -` のタスクをWave 2以降に配置する場合、ファイル競合等の正当な理由が `## Risks` セクションに明記されており、かつその競合が `Depends On` 列に依存関係として反映されているか
+- [ ] **ファイル競合チェック**: 全タスクの Input/Output/Details を横断し、同一ファイルを変更するタスクの組を特定したか。同一ファイルを変更するタスクに `Depends On` による直列化が設定されているか
+- [ ] **タスク粒度最適化**: 同一ペルソナの線形チェーン（3ステップ以下）で中間成果物を他タスクが参照しないケースを統合したか
+- [ ] **過分解チェック**: 2タスクの線形チェーンで両方が同一ペルソナの場合、統合を検討したか（統合しない場合は理由をRisksに記載）
 
 ### Self-Check結果の記録
 全項目チェック後、plan.md 末尾に以下を追記せよ:

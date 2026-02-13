@@ -109,6 +109,7 @@ plan_validation:
    a. `Depends On` が `-`（依存なし）のタスクを **Wave 1** としてグループ化
    b. Wave 1 のタスクに依存するタスクを **Wave 2** としてグループ化
    c. 以降、依存元が全て処理済みのタスクを次の Wave にグループ化（全タスク割当まで繰り返し）
+   d. **Wave割り当ては `Depends On` 列のみから計算せよ。plan.md の `## Execution Order` セクションは参照用であり、Wave割り当ての正データではない。** `Execution Order` と `Depends On` 列が矛盾する場合（例: `Depends On: -` のタスクがWave 2以降に配置されている場合）、`Depends On` 列を正とし、そのタスクをWave 1に含める。
 3. **Wave を並列実行する**:
    - **進捗メッセージ**: Wave 実行開始時にユーザーに通知する（ETA付き）
      - 例: `Wave 1/3: 3 tasks running (~2 min est.)`
