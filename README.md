@@ -31,7 +31,7 @@ The parent session directly manages all sub-agents. Sub-agents cannot spawn othe
 - **File-based communication** — Sub-agents read from and write to files. The parent passes paths, not content, keeping its context window lean.
 - **Up to 10 parallel sub-agents** — Launch multiple workers simultaneously for independent tasks.
 - **Persona switching** — Each worker can adopt a specialized role: researcher, coder, reviewer, or a custom persona defined by templates.
-- **Permission-based safety** — Claude Code's built-in permission system applies to all sub-agents, with a PermissionRequest hook (permission-fallback.sh) that dynamically approves python3/bash/sh execution of scripts under scripts/ directories via a 6-phase validation pipeline. No `--dangerously-skip-permissions` required.
+- **Permission-based safety** — Claude Code's built-in permission system applies to all sub-agents, with a PermissionRequest hook (permission-fallback.sh) that dynamically approves python3/bash/sh execution of scripts under scripts/ directories via an 8-phase validation pipeline. No `--dangerously-skip-permissions` required.
 - **Single-cycle completion** — A typical request (decompose → execute → aggregate → retrospect) completes within one context window, no compaction needed.
 - **Model flexibility** — Assign `haiku` for simple tasks, `sonnet` for balanced work, `opus` for complex reasoning — per sub-agent.
 
@@ -63,8 +63,8 @@ claude-crew/
 ├── .claude/
 │   ├── settings.json          # Permission settings for sub-agents
 │   └── hooks/
-│       ├── permission-fallback.sh      # PermissionRequest hook for dynamic approval (6-phase validation)
-│       └── test-permission-fallback.sh # Test suite for permission-fallback.sh (40+ security regression tests)
+│       ├── permission-fallback.sh      # PermissionRequest hook for dynamic approval (8-phase validation, bash 3.2 compatible)
+│       └── test-permission-fallback.sh # Test suite for permission-fallback.sh (156 security regression tests)
 ├── templates/
 │   ├── decomposer.md          # Task decomposition template
 │   ├── worker_common.md       # Shared rules for all worker personas
@@ -76,9 +76,18 @@ claude-crew/
 │   ├── aggregator.md          # Result aggregation template
 │   ├── retrospector.md        # Post-mortem analysis template
 │   └── multi_analysis.md      # N-viewpoint parallel analysis framework
+├── personas/                  # Custom worker persona definitions (optional)
 ├── scripts/
+│   ├── analyze_patterns.sh    # Extract workflow patterns from execution logs
+│   ├── health_check.sh        # Basic file structure validation
 │   ├── new_cmd.sh             # Atomic cmd directory creation
-│   └── validate_result.sh     # Result file validation (JSON output)
+│   ├── setup.sh               # Prerequisites check + Memory MCP connection test
+│   ├── smoke_test.sh          # End-to-end infrastructure test
+│   ├── stats.sh               # Parse execution logs for success rates
+│   ├── test_permission_hook.sh # Test suite for permission-fallback.sh
+│   ├── validate_config.sh     # Validate config.yaml fields and types
+│   ├── validate_result.sh     # Result file validation (JSON output)
+│   └── visualize_plan.sh      # Generate Mermaid diagram from plan.md
 └── work/
     └── cmd_xxx/               # Working directory per request
         ├── request.md
@@ -112,6 +121,9 @@ claude-crew/
    │                       │── Decomposer ─────────>│ Reads request,
    │                       │<── plan.md ────────────│ writes plan
    │                       │                        │
+   │                       │── Validator (optional)─>│ Reviews plan
+   │                       │<── validation ─────────│ (if plan_validation: true)
+   │                       │                        │
    │                       │── Worker A (parallel) ─>│ Task 1
    │                       │── Worker B (parallel) ─>│ Task 2
    │                       │── Worker C (parallel) ─>│ Task 3
@@ -131,10 +143,11 @@ claude-crew/
 
 1. **Request** — You describe what you need. The parent saves it to `work/cmd_NNN/request.md`.
 2. **Decompose** — A decomposer sub-agent analyzes the request and produces `plan.md`, breaking it into independent tasks.
-3. **Execute** — Worker sub-agents are launched in parallel (up to 10). Each reads its task file and writes a result file.
-4. **Aggregate** — An aggregator sub-agent reads all result files and produces the final `report.md` and `report_summary.md`.
-5. **Retrospect** — A retrospector sub-agent analyzes the execution for failure patterns and success patterns, generating improvement and skill proposals (can be disabled in `config.yaml`).
-6. **Report** — The parent returns the final report to you.
+3. **Validate** (optional) — If `plan_validation: true` in `config.yaml`, a validator sub-agent reviews the plan for feasibility, dependency issues, and resource allocation before execution begins.
+4. **Execute** — Worker sub-agents are launched in parallel (up to 10). Each reads its task file and writes a result file.
+5. **Aggregate** — An aggregator sub-agent reads all result files and produces the final `report.md` and `report_summary.md`.
+6. **Retrospect** — A retrospector sub-agent analyzes the execution for failure patterns and success patterns, generating improvement and skill proposals (can be disabled in `config.yaml`).
+7. **Report** — The parent returns the final report to you.
 
 The parent's role at each step is minimal: read the output file path from one sub-agent, pass it as input to the next.
 
@@ -188,7 +201,7 @@ The framework includes utility scripts for validation, testing, and analysis:
 
 | Script | Purpose | Usage |
 |--------|---------|-------|
-| `setup.sh` | Prerequisites check + quick-start guide | `bash scripts/setup.sh` |
+| `setup.sh` | Prerequisites check + Memory MCP connection test + quick-start guide | `bash scripts/setup.sh` |
 | `smoke_test.sh` | End-to-end infrastructure test | `bash scripts/smoke_test.sh` |
 | `validate_config.sh` | Validate config.yaml fields and types | `bash scripts/validate_config.sh` |
 | `validate_result.sh` | Validate result file metadata and completeness | `bash scripts/validate_result.sh <result_path> <persona>` |

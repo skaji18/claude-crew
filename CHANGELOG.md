@@ -6,6 +6,14 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Phase 1.5 safe suffix stripping** — Automatic handling of safe suffix removal during path normalization to prevent false positives in permission fallback checks (cmd_047)
+- **Phase 7 general command auto-approval** — Extended auto-approval mechanism for common commands with path containment validation to streamline permission fallback processing (cmd_048)
+- **Memory MCP connection check in setup.sh** — Added verification of Memory MCP service connectivity during initialization to ensure knowledge graph functionality is available (cmd_049)
+
+### Fixed
+- **macOS/bash 3.2 compatibility** — Resolved compatibility issues with permission-fallback.sh on macOS systems running bash 3.2 to ensure cross-platform operation (cmd_050)
+
 ## [1.0-rc] - 2026-02-11
 
 ### Added (v1.0-rc Features)

@@ -31,7 +31,7 @@ claude-crewは、1つのClaude Codeセッションを複数のサブエージェ
 - **ファイルベースの通信** — サブエージェントはファイルを読み書きして連携する。親はパスだけを渡し、コンテキストウィンドウを軽量に保つ。
 - **最大10並列のサブエージェント** — 独立したタスクに対して複数のWorkerを同時に起動できる。
 - **ペルソナ切り替え** — 各Workerはリサーチャー、コーダー、レビュアーなどの専門的な役割を担当可能。テンプレートでカスタムペルソナも定義できる。
-- **パーミッションによる安全性** — Claude Code標準のパーミッションシステムが全サブエージェントに適用される。PermissionRequest hook (permission-fallback.sh) により、scripts/ 配下のpython3/bash/shスクリプト実行を6段階検証パイプラインで動的に承認する。`--dangerously-skip-permissions` は不要。
+- **パーミッションによる安全性** — Claude Code標準のパーミッションシステムが全サブエージェントに適用される。PermissionRequest hook (permission-fallback.sh) により、scripts/ 配下のpython3/bash/shスクリプト実行を6段階検証パイプライン（bash 3.2互換）で動的に承認する。`--dangerously-skip-permissions` は不要。
 - **1サイクル完結** — 一般的なリクエスト（分解→実行→集約→回顧）は1つのコンテキストウィンドウ内で完了し、コンパクションは不要。
 - **モデルの柔軟な選択** — サブエージェントごとに、軽い作業には `haiku`、標準的な作業には `sonnet`、複雑な推論には `opus` を割り当てられる。
 
@@ -63,8 +63,8 @@ claude-crew/
 ├── .claude/
 │   ├── settings.json          # サブエージェントのパーミッション設定
 │   └── hooks/
-│       ├── permission-fallback.sh      # PermissionRequest hook（6段階検証パイプライン）
-│       └── test-permission-fallback.sh # permission-fallback.sh のテストスイート
+│       ├── permission-fallback.sh      # PermissionRequest hook（6段階検証パイプライン、bash 3.2互換）
+│       └── test-permission-fallback.sh # permission-fallback.sh のテストスイート（40+セキュリティ回帰テスト）
 ├── templates/
 │   ├── decomposer.md          # タスク分解テンプレート
 │   ├── worker_common.md       # 全workerペルソナ共通ルール
@@ -77,8 +77,16 @@ claude-crew/
 │   ├── retrospector.md        # 回顧分析テンプレート
 │   └── multi_analysis.md      # N観点並列分析フレームワーク
 ├── scripts/
+│   ├── setup.sh               # 前提条件チェック＋クイックスタートガイド（Memory MCP接続チェック含む）
+│   ├── smoke_test.sh          # エンドツーエンドインフラテスト
+│   ├── validate_config.sh     # config.yamlのフィールド・型検証
+│   ├── validate_result.sh     # 結果ファイルのメタデータ・完全性検証
+│   ├── stats.sh               # 実行ログから成功率・実行時間を解析
+│   ├── visualize_plan.sh      # plan.mdからMermaid図を生成
+│   ├── analyze_patterns.sh    # 実行ログからワークフローパターンを抽出
 │   ├── new_cmd.sh             # Atomic cmd directory creation
-│   └── validate_result.sh     # 結果ファイル検証（JSON出力）
+│   └── health_check.sh        # 基本的なファイル構造検証
+├── personas/                  # カスタムペルソナディレクトリ（オプション）
 └── work/
     └── cmd_xxx/               # リクエストごとの作業ディレクトリ
         ├── request.md
@@ -130,11 +138,12 @@ claude-crew/
 ### ステップごとの流れ
 
 1. **リクエスト** — やりたいことを伝える。親セッションがそれを `work/cmd_NNN/request.md` に保存する。
-2. **分解** — 分解役サブエージェントがリクエストを分析し、独立したタスクに分割した `plan.md` を生成する。
-3. **実行** — Workerサブエージェントが並列で起動される（最大10）。各Workerがタスクファイルを読み、結果ファイルを書き出す。
-4. **集約** — 集約役サブエージェントが全結果ファイルを読み、最終的な `report.md` と `report_summary.md` を生成する。
-5. **回顧** — 回顧役サブエージェントが実行結果を分析し、失敗パターンと成功パターンから改善提案・スキル化提案を生成する（`config.yaml` で無効化可能）。
-6. **報告** — 親セッションが最終レポートを返す。
+2. **分解 (Phase 1)** — 分解役サブエージェントがリクエストを分析し、独立したタスクに分割した `plan.md` を生成する。
+3. **プラン検証 (Phase 1.5)** — （オプション）複雑なプランの場合、検証役サブエージェントがプランの実現可能性と完全性をチェックする。
+4. **実行 (Phase 2)** — Workerサブエージェントが並列で起動される（最大10）。各Workerがタスクファイルを読み、結果ファイルを書き出す。
+5. **集約 (Phase 3)** — 集約役サブエージェントが全結果ファイルを読み、最終的な `report.md` と `report_summary.md` を生成する。
+6. **回顧 (Phase 4)** — 回顧役サブエージェントが実行結果を分析し、失敗パターンと成功パターンから改善提案・スキル化提案を生成する（`config.yaml` で無効化可能）。
+7. **報告** — 親セッションが最終レポートを返す。
 
 各ステップにおける親の役割は最小限 — あるサブエージェントの出力ファイルパスを読み取り、次のサブエージェントへの入力として渡すだけ。
 
@@ -181,6 +190,24 @@ work/
 ```
 
 すべてがプレーンなMarkdownファイル。中間出力も含め、自由に閲覧・編集・再利用できる。
+
+## スクリプト一覧
+
+フレームワークには検証、テスト、分析のためのユーティリティスクリプトが含まれている:
+
+| スクリプト | 用途 | 使用方法 |
+|-----------|------|---------|
+| `setup.sh` | 前提条件チェック＋クイックスタートガイド（Memory MCP接続チェック含む） | `bash scripts/setup.sh` |
+| `smoke_test.sh` | エンドツーエンドインフラテスト | `bash scripts/smoke_test.sh` |
+| `validate_config.sh` | config.yamlのフィールド・型検証 | `bash scripts/validate_config.sh` |
+| `validate_result.sh` | 結果ファイルのメタデータ・完全性検証 | `bash scripts/validate_result.sh <result_path> <persona>` |
+| `stats.sh` | 実行ログから成功率・実行時間を解析 | `bash scripts/stats.sh [work_dir]` |
+| `visualize_plan.sh` | plan.mdからMermaid図を生成 | `bash scripts/visualize_plan.sh [plan_path]` |
+| `analyze_patterns.sh` | 実行ログからワークフローパターンを抽出 | `bash scripts/analyze_patterns.sh [output_path]` |
+| `new_cmd.sh` | 新規cmdディレクトリをアトミックに作成 | `bash scripts/new_cmd.sh` |
+| `health_check.sh` | 基本的なファイル構造検証 | `bash scripts/health_check.sh` |
+
+すべてのスクリプトはbashベストプラクティス（`set -euo pipefail`）に従い、ヘッダーに使用方法のドキュメントが含まれている。
 
 ## 制約事項
 

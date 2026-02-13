@@ -101,7 +101,7 @@ Phase 1（decomposer起動）は**原則必須**である。タスクの複雑�
 - サブエージェントは親セッションのパーミッション設定を継承する
 - 3段階制御: deny（自動拒否）> ask（毎回確認）> allow（自動許可）
 - 詳細は `.claude/settings.json` 参照。deny リストの操作はバイパス不可
-- **PermissionRequest hook**: `.claude/hooks/permission-fallback.sh` は python3/bash/sh による scripts/ 配下・.claude/hooks/ 配下スクリプト実行を動的に承認する。6段階検証パイプライン（正規化 → 前解析 → 解析 → オプション正規化 → パス正規化 → 判定）で入力を厳密に検証し、path traversal/変数展開/危険フラグ注入を防止する
+- **PermissionRequest hook**: `.claude/hooks/permission-fallback.sh` は python3/bash/sh による scripts/ 配下・.claude/hooks/ 配下スクリプト実行を動的に承認する。8段階検証パイプライン（正規化 → サフィックス除去 → 前解析 → 解析 → オプション正規化 → パス正規化 → 判定 → 汎用コマンド承認）で入力を厳密に検証し、path traversal/変数展開/危険フラグ注入を防止する
 
 ## Memory MCP活用
 
