@@ -44,6 +44,42 @@ reject() {
   exit 0
 }
 
+# --- Helper: portable path canonicalization (replaces GNU realpath -m) ---
+# Lexically normalizes an absolute path: resolves . and .. components.
+# Does NOT resolve symlinks. Does NOT require the path to exist.
+# Compatible with bash 3.2+ (no arrays, no GNU coreutils).
+# Input: an absolute path (must start with /)
+# Output: canonicalized absolute path on stdout
+_canonicalize_path() {
+  local path="$1"
+  local old_ifs="${IFS:-}"
+  local result=""
+  local arg
+
+  # Split path on / using positional parameters (avoids bash 4.0+ array features)
+  IFS='/'
+  set -f  # disable globbing during word split
+  # shellcheck disable=SC2086
+  set -- $path
+  set +f
+  IFS="$old_ifs"
+
+  for arg in "$@"; do
+    case "$arg" in
+      "" | ".") continue ;;
+      "..")
+        # Strip last component: /a/b/c -> /a/b (cannot go above root)
+        result="${result%/*}"
+        ;;
+      *)
+        result="$result/$arg"
+        ;;
+    esac
+  done
+
+  printf '%s' "${result:-/}"
+}
+
 # Guard S0: Reject null bytes in raw input (before jq processing).
 # Bash command substitution strips null bytes, so [[:cntrl:]] check would miss them.
 # Null bytes in JSON (\u0000) get converted by jq to real 0x00, then bash strips them,
@@ -97,7 +133,7 @@ DANGEROUS_LONG_FLAGS_sh="--init-file --rcfile"
 # effects cannot be assessed by examining path arguments alone.
 #
 # Organized by reason. Edit to add/remove commands.
-# Lookup is via bash associative array (O(1) per command).
+# Lookup is via space-padded string matching (bash 3.2 compatible).
 
 # Network: primary data exfiltration / remote access vectors
 # Omitted (user-manageable): sftp ncat netcat ping dig nslookup host
@@ -136,11 +172,8 @@ if [[ -f "$_HOOK_DIR/permission-config.sh" ]]; then
   source "$_HOOK_DIR/permission-config.sh"
 fi
 
-# Build associative array for O(1) lookup
-declare -A _ALWAYS_ASK_SET
-for _cmd in $ALWAYS_ASK_NETWORK $ALWAYS_ASK_PRIVILEGE $ALWAYS_ASK_EXECUTION $ALWAYS_ASK_PACKAGE $ALWAYS_ASK_INTERPRETERS; do
-  _ALWAYS_ASK_SET["$_cmd"]=1
-done
+# Build space-padded lookup string (bash 3.2 compatible, no associative arrays)
+_ALWAYS_ASK_ALL=" $ALWAYS_ASK_NETWORK $ALWAYS_ASK_PRIVILEGE $ALWAYS_ASK_EXECUTION $ALWAYS_ASK_PACKAGE $ALWAYS_ASK_INTERPRETERS "
 
 # =======================================================
 # Phase 1: Sanitize — reject malformed input
@@ -406,15 +439,15 @@ if [[ -n "${CLAUDE_PROJECT_DIR:-}" && "$CLAUDE_PROJECT_DIR" != "$PROJECT_DIR" ]]
   echo "WARNING: CLAUDE_PROJECT_DIR mismatch (expected=$PROJECT_DIR, got=$CLAUDE_PROJECT_DIR). Using computed." >&2
 fi
 
-# Normalize the script path to absolute using realpath -m (--canonicalize-missing).
-# This resolves .., ., symlinks, and produces a clean absolute path
-# even if the file doesn't exist.
+# Normalize the script path to absolute using portable canonicalization.
+# Resolves .., . and produces a clean absolute path even if the file doesn't exist.
+# (Replaces GNU realpath -m for macOS/bash 3.2 compatibility.)
 if [[ "$SCRIPT_PATH" == /* ]]; then
   # Already absolute
-  ABS_PATH=$(realpath -m "$SCRIPT_PATH" 2>/dev/null) || reject "P5:realpath_failed"
+  ABS_PATH=$(_canonicalize_path "$SCRIPT_PATH")
 else
   # Relative to project directory
-  ABS_PATH=$(realpath -m "$PROJECT_DIR/$SCRIPT_PATH" 2>/dev/null) || reject "P5:realpath_failed"
+  ABS_PATH=$(_canonicalize_path "$PROJECT_DIR/$SCRIPT_PATH")
 fi
 
 # Safety check: ABS_PATH must be non-empty
@@ -473,7 +506,7 @@ CMD_NAME=$(basename "${WORDS[0]}")
 [[ "${PERMISSION_DEBUG:-0}" == "1" ]] && echo "P7A:cmd=$CMD_NAME" >&2
 
 # --- Step 7B: Check ALWAYS_ASK list ---
-if [[ -n "${_ALWAYS_ASK_SET[$CMD_NAME]+x}" ]]; then
+if [[ "$_ALWAYS_ASK_ALL" == *" $CMD_NAME "* ]]; then
   reject "P7B:always_ask:$CMD_NAME"
 fi
 
@@ -481,7 +514,7 @@ fi
 # Walk WORDS[1..n], skipping flags (words starting with -)
 # After --, treat all remaining words as positional arguments.
 # Path-like: starts with / or ./ or ../ or contains /
-declare -a P7_PATH_ARGS=()
+P7_PATH_ARGS=()
 P7_PAST_DD=false
 P7_IDX=1
 
@@ -545,11 +578,11 @@ fi
 
 # Check each path argument for project containment
 for p7_path in "${P7_PATH_ARGS[@]}"; do
-  # Resolve to absolute
+  # Resolve to absolute (portable, no GNU realpath needed)
   if [[ "$p7_path" == /* ]]; then
-    P7_ABS=$(realpath -m "$p7_path" 2>/dev/null) || reject "P7D:realpath_failed"
+    P7_ABS=$(_canonicalize_path "$p7_path")
   else
-    P7_ABS=$(realpath -m "$PROJECT_DIR/$p7_path" 2>/dev/null) || reject "P7D:realpath_failed"
+    P7_ABS=$(_canonicalize_path "$PROJECT_DIR/$p7_path")
   fi
 
   [[ -z "$P7_ABS" ]] && reject "P7D:empty_abs"
@@ -564,7 +597,8 @@ for p7_path in "${P7_PATH_ARGS[@]}"; do
   if ! $P7_CONTAINED && [[ -n "$ALLOWED_DIRS_EXTRA" ]]; then
     for p7_extra_dir in $ALLOWED_DIRS_EXTRA; do
       [[ -z "$p7_extra_dir" ]] && continue
-      P7_RESOLVED_EXTRA=$(realpath -m "$p7_extra_dir" 2>/dev/null) || continue
+      P7_RESOLVED_EXTRA=$(_canonicalize_path "$p7_extra_dir")
+      [[ -z "$P7_RESOLVED_EXTRA" ]] && continue
       if [[ "$P7_ABS" == "$P7_RESOLVED_EXTRA" ]] || [[ "$P7_ABS" == "$P7_RESOLVED_EXTRA/"* ]]; then
         P7_CONTAINED=true
         break
