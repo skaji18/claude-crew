@@ -1,6 +1,7 @@
 # claude-crew
 
 日本語版: [README_ja.md](./README_ja.md)
+クイックガイド: [docs/overview.md](./docs/overview.md) (日本語)
 
 A multi-agent framework powered by Claude Code's Task tool. One session, multiple sub-agents working in parallel — no complex setup required.
 

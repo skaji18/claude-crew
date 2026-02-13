@@ -1,6 +1,7 @@
 # claude-crew
 
 English version: [README.md](./README.md)
+クイックガイド: [docs/overview.md](./docs/overview.md)
 
 Claude CodeのTask toolを活用したマルチエージェントフレームワーク。1つのセッションで複数のサブエージェントが並列稼働し、複雑なセットアップは一切不要。
 
