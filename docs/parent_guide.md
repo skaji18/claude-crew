@@ -17,6 +17,23 @@
    ```
 2. execution_log.yaml のトップレベルに `base_commit: {hash}` を記録する
 
+### Pre-Action Gate（必須）
+
+タスク受領後、コミット準備の後、ファイル操作の前に以下を確認する:
+
+**Q1: 例外条件に該当するか？**
+→ Phase 1 例外条件（6項目）を確認。該当する場合のみ Phase 1 省略手順へ。
+  ただし省略手順でも worker への委譲は必須（親の直接 Edit/Write は禁止）。
+
+**Q2: 入力ソースは何か？**
+→ Plan mode の出力、他セッションからの転送、ユーザーの直接指示、
+  いずれの場合も request.md に書き出して Phase 1 に渡す。
+  ※ 既に詳細な計画が存在していても、Phase 1（decomposer）は省略不可。
+
+**Q3: 自分（親）が Edit/Write を使おうとしていないか？**
+→ YES の場合、STOP。execution_log.yaml 以外のファイルを
+  親が直接編集してはならない。worker に委譲する。
+
 ### フェーズ1: 分解（Decompose）
 
 **Phase instructions**: If `config.yaml: phase_instructions.decompose` is non-empty, append its content to the decomposer prompt.
@@ -1132,6 +1149,15 @@ work/
 - 並列実行の利点が失われ、複数ファイルの変更が直列化される
 
 **正解**: 例外条件に該当しない限り、必ず decomposer を起動してタスク分解を行う
+
+**間違い**: Plan mode の出力を受けて親が直接実装する
+
+**なぜ起きるか**:
+- "Implement the following plan" が直接実行を誘導する
+- Plan の詳細さが decomposer を不要に見せる
+- 新セッション境界でワークフローの意識がリセットされる
+
+**正解**: Plan mode の出力を request.md に書き出し、Phase 1 から開始する
 
 ### Learned Preferences (LP) — Full Documentation
 

@@ -10,6 +10,7 @@ Read `docs/parent_guide.md` before starting.
 Crew workflow (Phase 1 -> Phase 2 -> Phase 3) is mandatory for all tasks. Phase 4 (retrospect) is optional.
 Parent session must NOT directly Edit/Write files (except execution_log.yaml).
 Phase 1 (decomposer) is mandatory except for trivial single-line edits.
+Plan mode output ("Implement the following plan:") is not a workflow exception. Start from Phase 1.
 See `docs/parent_guide.md` for full rules, exception list, and role restrictions.
 
 ## Config
