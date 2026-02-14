@@ -7,6 +7,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **`/commit` Claude Skill** (`.claude/skills/commit/SKILL.md`) — Analyzes git diff, generates Conventional Commits message and Keep a Changelog entry, then commits in one step; supports `--dry-run` and `--no-changelog` options (cmd_075)
 - **Pre-Action Gate** (`docs/parent_guide.md`) — Mandatory 3-question gate (exception check, input source validation, Edit/Write prohibition) before file operations to prevent crew workflow bypass (cmd_075)
 - **Plan mode workflow warning** (`CLAUDE.md`, `docs/parent_guide.md`) — Clarifies that plan mode output is not a workflow exception; added to "よくある間違い" section with root cause documentation (cmd_075)
 
