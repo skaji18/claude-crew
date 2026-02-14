@@ -47,6 +47,33 @@ YAMLブロックの後に続く本文は各workerのペルソナに応じて異�
       type: best_practice / failure_pattern / tech_decision / lesson_learned
       observation: "[What] パターン記述 [Evidence] 根拠 [Scope] 適用条件"
 
+## Learned Preferences (LP) — Optional
+
+**タスク開始時**: `mcp__memory__search_nodes(query="lp:")` を実行し、関連するLP(学習済み好み)があれば取得せよ。LPは以下の形式で記録されている:
+
+```
+[what] 傾向記述 [evidence] 根拠 [scope] 適用条件 [action] AI行動指針
+```
+
+**完全な例**:
+```
+[what] Linter/formatter設定ファイルは変更しない [evidence] AI提案の設定変更を3回revert [scope] Universal [action] Linter/formatter設定変更は絶対に行わない。必要な場合は明示的な許可を求める
+```
+
+**適用原則**:
+1. **黙って使え（作業中）**: LP適用をユーザーに通知しない。自然に反映せよ。**ただし例外**: ユーザーが「なぜXをしたのか？」と直接質問した場合、LPの影響を簡潔に説明してよい（"以前の好みに基づいて〜"程度）
+2. **デフォルトであって強制ではない**: タスク指示が明示的に異なる要求をした場合、タスク指示が優先。LPを上書き
+3. **絶対品質は不変**: 正確性・安全性・完全性・セキュリティ・テストカバレッジはLPで変えてはならない。LPで調整可能なのは相対品質のみ(スタイル、設計選択、報告形式、確認頻度等)
+
+**使い方**:
+- `[scope]` を確認し、**現在のプロジェクト・タスクタイプ・技術スタックに関連するか判定**
+- 関連する場合、`[action]` の指針を行動デフォルトとして適用
+- LPが見つからない、または関連性が低い場合は通常通り実行
+
+**例**: `lp:avoid:linter_changes` のLPが「設定ファイルは変更しない」と指示している場合、リファクタリングタスク内でlinter設定の最適化が考えられても実行しない。ただしタスクが明示的に「ESLint設定を更新して」と指定していればそちらが優先。
+
+**Principle 1の補足**: 「黙って使え」はworkerの作業実行中の原則である。Retrospectorによる承認フロー（Principle 5）では当然LPの内容を明示する。2つの原則は矛盾しない。
+
 ## Shared Notes
 
 If you discover information that would benefit other tasks in the same cmd (e.g., a file structure convention, an API quirk, a dependency constraint), append it to `WORK_DIR/shared_notes.md`. Format: `### Task N: [topic]\n[finding]\n`. Workers should check `shared_notes.md` at task start (if it exists) for relevant context from previously completed tasks. This is optional — only write when genuinely useful cross-task information is discovered. WORK_DIR is the parent of the `tasks/` and `results/` directories (e.g., `work/cmd_044/`).

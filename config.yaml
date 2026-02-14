@@ -42,6 +42,37 @@ retrospect:
     max_candidates_per_cmd: 5    # Max Memory MCP candidates per cmd (aggregator enforces)
     skill_min_score: 12          # Minimum 3-axis score for skill proposals (max=15)
 
+# Learned Preferences (LP) System
+# Learns user preferences from interaction patterns to reduce translation cost
+lp_system:
+  # Core toggles
+  enabled: true                  # Enable/disable LP system entirely (boolean)
+  collect_signals: true          # Enable/disable signal detection (boolean)
+                                 # If false: existing LPs still apply, no new learning
+
+  # Privacy controls
+  reset_all: false               # One-shot flag: delete all LP data on next run (boolean)
+                                 # Set to true → parent deletes all lp:* entities + internal state
+                                 # Then auto-sets: enabled: false, reset_all: false
+
+  # Visibility
+  debug_mode: false              # Annotate LP-influenced decisions in output (boolean)
+                                 # true → show "[LP applied: ...]" in worker output
+                                 # false → silent application (Principle 1)
+
+  # Limits
+  lp_cap: 40                     # Maximum active LP entities (integer, range: 30-50)
+                                 # When reached, trigger pruning review
+
+  # Context (optional - for cross-project scope handling)
+  project_scope: ""              # Optional project context tag (string)
+                                 # Examples: "typescript-enterprise", "python-scripting"
+                                 # LPs learned here get tagged with this scope
+
+  technology_stack: []           # Optional technology stack list (array of strings)
+                                 # Examples: ["TypeScript", "React", "Node.js"]
+                                 # Used for auto-inferring LP scope
+
 # Phase-specific custom instructions (optional)
 # Appended to phase prompts when non-empty
 phase_instructions:

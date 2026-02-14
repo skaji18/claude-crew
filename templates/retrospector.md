@@ -30,6 +30,8 @@ mcp__memory__search_nodes(query="best_practice")
 mcp__memory__search_nodes(query="lesson_learned")
 mcp__memory__search_nodes(query="tech_decision")
 mcp__memory__search_nodes(query="workflow:rejected_proposal")
+mcp__memory__search_nodes(query="lp:")
+mcp__memory__search_nodes(query="lp:_internal:signal_log")  # Retrieve pending signal counters
 ```
 
 Note any patterns found — they will be used for:
@@ -37,6 +39,8 @@ Note any patterns found — they will be used for:
 - Excluding duplicate proposals (qualitative filter)
 - Trend analysis (Step 12)
 - Filtering proposals based on rejection memory (Step 13)
+- Accurately tracking cross-session signal accumulation
+- Detecting LP contradictions (Step 8.5)
 
 If Memory MCP is empty or returns no results, proceed normally.
 
@@ -152,6 +156,222 @@ Classify successes into these 6 categories:
 | **Workflow** | Are there repeatable procedures worth codifying? | New skill candidates |
 
 Generate skill/template proposals based on success analysis. Each proposal follows the format defined in the Proposal Format section.
+
+### Step 8.5: Detect Learned Preference Signals and Generate LP Candidates (full and light modes)
+
+**NEW STEP**: Analyze conversation patterns to detect user preferences worth learning.
+
+#### 8.5.1: Signal Detection
+
+**CRITICAL**: Use SEMANTIC ANALYSIS, not keyword matching. You are an AI agent with judgment — analyze the MEANING of user corrections, not just surface patterns.
+
+Identify 4 signal types by analyzing conversation context:
+
+| Signal Type | Weight | Semantic Indicators (Japanese) | Semantic Indicators (English) |
+|-------------|:------:|--------------------------------|-------------------------------|
+| **Course Correction** | 1.0 | ユーザーがAIのアプローチを修正 | User redirects AI's approach/method |
+| **Afterthought Supplement** | 0.7 | タスク完了後に暗黙期待を追加 | User adds implicit expectation post-task |
+| **Rejection/Revert** | 1.0 | AIの行動を明示的に却下/復元 | User explicitly rejects/reverts AI action |
+| **Repeated Specification** | 0.7 | 独立セッション間で同じ指示 | Same instruction across independent sessions |
+
+**重み付き蓄積**: 各信号の重みをカウンタに加算。合計 >= 3.0 でLP候補化。詳細は 8.5.2 参照。
+
+**Signal Capture Guidelines**:
+
+- **Course Correction**: Analyze whether user is correcting AI's approach (not just fixing a bug). Look for:
+  - User statement contradicting AI's recent action/proposal
+  - Alternative approach suggested by user
+  - Context: What aspect was wrong? (method, priority, scope, etc.)
+
+- **Afterthought Supplement**: Distinguish between NEW requests vs. implicit expectations. Signals:
+  - User adds task AFTER AI marked work complete
+  - Phrasing suggests expectation ("don't forget", "of course you did X, right?")
+  - Pattern: Same supplement across multiple similar tasks
+
+- **Rejection/Revert**: Identify explicit rejection. Validate:
+  - Is user rejecting AI's action (not their own prior request)?
+  - Is rejection about action category (not just execution error)?
+  - Is there a pattern (single rejection is not enough)?
+
+- **Repeated Specification**: Track across sessions. Requirements:
+  - Same preference stated in 2+ independent sessions
+  - NOT within-session repetition
+  - Semantically equivalent (not just exact string match)
+
+**What NOT to capture**:
+- File names, line numbers, specific code snippets
+- Session IDs, cmd IDs, timestamps
+- One-off clarifications without pattern
+- Within-session contradictions (trial-and-error behavior)
+
+**Example phrases** (use as hints, not rigid rules):
+
+**Japanese course correction**: そうじゃなくて、違う、〜の方が
+**English course correction**: not X but Y, wrong direction, I meant X
+
+**Japanese afterthought**: あ〜もお願い、ついでに、当然〜も
+**English afterthought**: oh also, don't forget, assumed you'd
+
+**Japanese rejection**: revert, 元に戻して、触らないで
+**English rejection**: revert, undo, don't change X
+
+#### 8.5.2: Signal Accumulation
+
+For each detected signal:
+
+1. **Identify topic**: Use semantic clustering to group signals by preference dimension
+   - Example: "依存削減", "dependency reduction", "minimize dependencies" → same topic
+2. **Update counter**: Add signal weight to topic counter
+   - Same-direction signals: add weight
+   - Contradictory signals: decrement by 1.0 (floor at 0)
+   - Within-session repetition: count only once
+3. **Check threshold**: If counter >= 3.0, proceed to distillation
+
+**Explicit Declaration Bypass**:
+- Trigger phrases: "いつも[X]", "必ず[X]", "always [X]", "never [X]", "default to [X]"
+- Action: Set counter to 3.0 immediately, create LP candidate
+
+**Contradiction Handling**:
+- **Temporary override**: Phrases like "今回は[alternative]で", "this time [alternative]", "just for now [alternative]", "exception: [alternative]" → do NOT decrement
+- **General contradiction**: Contradicts accumulated signals without "one-time" phrasing → decrement by 1.0
+- **Conflict with existing LP**: Search Memory MCP for existing LP entities, note contradictions
+
+**Temporal Independence Validation** (from design spec Section 6):
+
+Signals must come from sessions separated by at least **2 hours OR different task types**.
+
+**Implementation**:
+- When accumulating signals, check session timestamps
+- Signals from same session = count as single signal (max weight among them)
+- Example: 3 course corrections in same stressed session = 1.0 weight total, not 3.0
+
+**Rationale**: Prevents emotional/situational states from being learned as stable preferences. User having a bad day → 3 frustrated corrections → should NOT become LP.
+
+#### 8.5.2b: Update Signal Log (Cross-Session Persistence)
+
+After accumulating signals from current session, **update `lp:_internal:signal_log` entity** to persist counters:
+
+**Read existing signal log** (retrieved in Step 1):
+- If `lp:_internal:signal_log` exists, parse existing counters
+- Each observation format: `[topic] {cluster}:{topic} [counter] {X.X} [last_updated] {date} [signals] {history} [sessions] {N} [first_signal] {date}`
+
+**Merge current session signals**:
+- For each detected signal in current session:
+  1. Find matching topic in signal log
+  2. Add signal weight to counter
+  3. Update `[last_updated]` to current date
+  4. Append signal to `[signals]` history
+  5. Increment `[sessions]` count (if new session)
+
+**Generate updated signal log observations**:
+- Topics with counter < 3.0: Keep in signal log (pending)
+- Topics with counter >= 3.0: Remove from signal log, generate LP candidate (will be presented in Step 8.5.7)
+
+**Output signal log update** in retrospective.md:
+```markdown
+## Internal State Updates
+
+**Signal Log Updates**:
+- Topic `vocabulary:simplicity`: counter 2.0 → 2.7 (added afterthought signal +0.7)
+- Topic `defaults:language_choice`: counter 2.5 → 3.5 (added repeated spec +0.7, now eligible for LP candidate)
+- Topic `avoid:linter_changes`: counter 3.2 (removed from signal log, LP candidate generated)
+
+**Note**: Parent session will execute signal log updates via Memory MCP write during approval flow.
+```
+
+**Critical**: Without this step, signals do not persist across sessions, and the N>=3 rule effectively requires 3 signals in a single session (breaking temporal independence).
+
+#### 8.5.3: LP Candidate Distillation (4-step process)
+
+For each topic with counter >= 3.0:
+
+**Step 1: Extract Stable Tendency (what)**
+- Identify common direction across all signals
+- Abstraction level: general enough for cross-session use, specific enough to be actionable
+- Format: `[context]: [preference/expectation]`
+- Example: "For 'simplicity' in refactoring: dependency reduction, not line count reduction"
+
+**Step 2: Summarize Evidence (evidence)**
+- Include: signal type distribution, occurrence count, consistency indicator
+- Exclude: timestamps, cmd IDs, file names, code snippets
+- Format: `[Signal summary] across [N] independent observations. [Consistency note]`
+- Example: "1 course correction + 2 afterthoughts across 3 code modification tasks"
+
+**Step 3: Infer Scope (scope)**
+- Define WHERE this preference applies
+- Scope levels (narrow to broad): specific context → task category → domain → general
+- **Project context consideration**: Infer technology stack or project type from signals. If signals came from specific technology context (e.g., Java enterprise, Python scripting), include in scope.
+- Context-dependency: If contradictions exist, scope is narrower (may create separate LPs)
+- Default: Use task category or domain level (NOT general unless signals span all contexts)
+- Example: "Refactoring and design decisions" or "Python scripting projects" or "Enterprise Java codebases"
+
+**Step 4: Derive Actionable Directive (action)**
+- Format: Imperative statement, specific and measurable
+- Structure: `[When condition], [do action]. [Exception if applicable]`
+- Must be executable without human clarification
+- Example: "When user says 'simplify', prioritize dependency reduction over code line reduction"
+
+#### 8.5.4: Quality Guardrails
+
+**Absolute Quality Filter** (MANDATORY):
+
+NEVER propose LP candidates that compromise:
+- Correctness (code does what it's supposed to)
+- Completeness (all requested functionality delivered)
+- Security (no vulnerabilities)
+- Safety (no data loss, no breaking production)
+- Test coverage for critical paths
+
+**Forbidden LP examples**:
+- "User prefers skipping tests"
+- "User accepts incomplete implementations"
+- "User is okay with potential data loss"
+
+**Allowed LP examples**:
+- "User prefers concise test descriptions" (style choice, not coverage reduction)
+- "User prefers delivering minimal scope first, then iterating" (valid strategy)
+- "User accepts slower performance for readability in non-critical paths" (valid tradeoff)
+
+#### 8.5.5: LP Cluster Assignment
+
+Assign each LP candidate to one of 6 clusters:
+
+| Cluster | Definition | Example Topic |
+|---------|------------|---------------|
+| `vocabulary` | How user defines ambiguous terms | "simplicity", "properly", "clean up" |
+| `defaults` | Values user repeatedly specifies | language_choice, test_framework |
+| `avoid` | Things user consistently rejects | linter_changes, premature_abstraction |
+| `judgment` | Tradeoff decision patterns | readability_vs_performance, dry_vs_explicit |
+| `communication` | Interaction style preferences | confirmation_frequency, report_verbosity |
+| `task_scope` | Task-scope expansion patterns | modification_scope, documentation_update |
+
+**Naming convention**: `lp:{cluster}:{topic}`
+- Example: `lp:vocabulary:simplicity`, `lp:defaults:language_choice`, `lp:avoid:linter_changes`
+
+#### 8.5.6: Check Existing LPs for Contradictions
+
+Search Memory MCP for existing LP entities (already retrieved in Step 1).
+
+For each LP candidate:
+1. Check if an LP with the same topic already exists
+2. If yes, compare `[action]` directives:
+   - **Same direction**: Reinforcement (note in evidence)
+   - **Contradictory**: Generate LP update candidate instead of new LP
+   - **Context-dependent**: Propose scope addition (append conditional observation)
+
+**LP Update Candidate Format**:
+```markdown
+### LP-UPD-001: [Topic] (Update)
+- **Existing LP**: lp:{cluster}:{topic}
+- **Current observation**: [show existing observation]
+- **Update reason**: [N contradictory signals summary]
+- **Proposed change**: Replace / Append as conditional / Mark deprecated
+- **New observation**: [show proposed observation]
+```
+
+#### 8.5.7: Output LP Candidates
+
+Append to retrospective.md output (see Output Format section for details).
 
 ### Step 9: Extract Failure Signatures (full mode only)
 
@@ -438,6 +658,7 @@ improvements_accepted: 1      # Number of adopted improvement proposals
 skills_accepted: 1            # Number of adopted skill proposals
 proposals_held: 1             # Number of held proposals
 proposals_rejected: 2         # Number of discarded proposals
+knowledge_candidates_proposed: 3  # Total Memory MCP + LP candidates proposed
 ---
 
 # Retrospective: cmd_xxx
@@ -475,17 +696,50 @@ proposals_rejected: 2         # Number of discarded proposals
 - **Skill scores**: Formalizability X / Automation X / Frequency X = **Total X** (12+: recommended)
 - **Filter scores**: Recurrence X / Impact X / Generality X / Feasibility X = **Total X.X**
 
+## Knowledge Candidates (Memory MCP + LP)
+
+**Note**: LP candidates apply to workers (Principle 1: silent during work). Retrospector reveals LP content during approval (Principle 5: requires approval). These principles do not conflict — they apply to different agents.
+
+### HIGH Priority
+
+#### LP-001: [Topic Title]
+- **Type**: Learned Preference
+- **Cluster**: `lp:{cluster}:{topic}` (e.g., `lp:vocabulary:simplicity`)
+- **What**: [Distilled tendency — what the user prefers in this context]
+- **Evidence**: [Signal summary without cmd_NNN references — e.g., "1 course correction + 2 afterthoughts across 3 tasks"]
+- **Scope**: [Application conditions — e.g., "Refactoring and design decisions"]
+- **Action**: [Behavioral directive — e.g., "When user says 'simplify', prioritize dependency reduction over code line reduction"]
+- **Signal accumulation**: X.X (threshold: 3.0)
+- **Quality check**: PASS — does not compromise correctness, safety, completeness, security, or critical test coverage
+
+#### MCP-001: [Title]
+- **Type**: best_practice / failure_pattern / tech_decision / lesson_learned
+- **Entity name**: `{domain}:{category}:{identifier}`
+- **Observation**: `[What] パターン記述 [Evidence] 根拠 [Scope] 適用条件`
+
+### MEDIUM Priority
+
+#### LP-UPD-001: [Topic Title] (Update to existing LP)
+- **Type**: LP Update
+- **Existing LP**: `lp:{cluster}:{topic}`
+- **Current observation**: [Show existing observation from Memory MCP]
+- **Update reason**: [N contradictory signals summary]
+- **Proposed change**: Replace / Append as conditional / Mark deprecated
+- **New observation**: [Show proposed observation]
+- **Signal accumulation**: X.X (threshold: 3.0 for updates)
+
+### LOW Priority
+
+[Additional knowledge candidates with lower priority]
+
+**Approval guidance**: HIGH priority = immediate value, MEDIUM = reinforces existing knowledge, LOW = nice-to-have
+
 ## Held Proposals
 - IMP-002: [1-line summary] (Score: X.X)
 - SKL-002: [1-line summary] (Score: X.X)
 
 ## Trend Analysis
 - [Pattern]: Observed N times across M commands. [Preventive suggestion if applicable]
-
-## Memory MCP追加候補
-- name: "{domain}:{category}:{identifier}"
-  type: best_practice / failure_pattern / tech_decision / lesson_learned
-  observation: "[What] パターン記述 [Evidence] 根拠 [Scope] 適用条件"
 ```
 
 **When there are no proposals** (all candidates were filtered out or no patterns detected):
@@ -500,6 +754,7 @@ improvements_accepted: 0
 skills_accepted: 0
 proposals_held: 0
 proposals_rejected: 0
+knowledge_candidates_proposed: 0
 ---
 
 # Retrospective: cmd_xxx
@@ -515,6 +770,10 @@ proposals_rejected: 0
 
 No skill candidates met the adoption threshold.
 
+## Knowledge Candidates (Memory MCP + LP)
+
+No knowledge candidates generated (no signals reached threshold, or LP system disabled).
+
 ## Held Proposals
 
 None.
@@ -522,10 +781,6 @@ None.
 ## Trend Analysis
 
 No recurring patterns detected.
-
-## Memory MCP追加候補
-
-None.
 ```
 
 ## Input Validation
@@ -552,5 +807,8 @@ Before starting analysis, validate all required inputs:
 - Every score (1-5) in every proposal MUST include justification. Scores without rationale are prohibited.
 - Do not recommend changes that significantly increase context consumption for existing templates.
 - The retrospector recommends Memory MCP entries but does NOT write to Memory MCP directly.
-- **YAMLフロントマターのメタデータブロックは絶対必須。** `---` で囲んだYAMLブロックをファイル先頭に配置し、status, mode, trigger, quality_before, improvements_accepted, skills_accepted, proposals_held, proposals_rejected を必ず含めよ。
+- **YAMLフロントマターのメタデータブロックは絶対必須。** `---` で囲んだYAMLブロックをファイル先頭に配置し、status, mode, trigger, quality_before, improvements_accepted, skills_accepted, proposals_held, proposals_rejected, knowledge_candidates_proposed を必ず含めよ。
+- **LP candidates**: The retrospector recommends LP candidates but does NOT write to Memory MCP directly. Parent session handles approval flow.
+- **LP quality guardrail**: NEVER propose LP candidates that compromise absolute quality (correctness, safety, completeness, security, critical test coverage). Always apply the absolute quality filter in Step 8.5.4.
+- **Signal detection approach**: Use SEMANTIC ANALYSIS with AI judgment, not rigid keyword matching. Analyze conversation MEANING, not just surface patterns.
 - **完了マーカー**: ファイル書き込みの最終行に `<!-- COMPLETE -->` を必ず追記せよ。このマーカーが親による書き込み完全性チェックに使われる。

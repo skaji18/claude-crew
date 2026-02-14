@@ -183,6 +183,67 @@ workerから提案された候補に対し、以下の3ステップで統合・�
 親セッションで人間に確認を求めること。
 ```
 
+## LP-Specific Quality Check (Principle 3 Enforcement)
+
+**CRITICAL**: When synthesizing results from multiple tasks, verify that no LP-influenced decisions compromised absolute quality.
+
+### Absolute Quality Preservation Audit
+
+For each task result, check if LP application preserved:
+
+- [ ] **Correctness**: All code logic is correct (no LP-caused logic errors)
+- [ ] **Completeness**: All requirements delivered (no LP-caused omissions)
+- [ ] **Security**: No vulnerabilities introduced (no LP-caused security gaps)
+- [ ] **Safety**: No data loss risk (no LP-caused safety issues)
+- [ ] **Test Coverage**: Critical paths tested (no LP-caused coverage reduction)
+
+### Suspicious LP-Influenced Patterns
+
+Watch for these anti-patterns in aggregated results:
+
+| Pattern | Likely LP Cause | Aggregator Action |
+|---------|----------------|-------------------|
+| Multiple tasks with minimal test coverage | "User prefers concise tests" misapplied | Flag in quality section, recommend LP scope review |
+| Multiple tasks with missing input validation | "User prefers simple code" misapplied | CRITICAL flag, recommend immediate LP audit |
+| Multiple tasks with cryptic variable names | "User prefers brief names" misapplied | Flag in quality section |
+| Multiple tasks with no error handling | "User accepts minimal error handling" misapplied | CRITICAL flag, recommend LP deletion |
+
+### LP Conflict Detection
+
+If different tasks applied conflicting LPs, note the conflict:
+
+```markdown
+## LP Conflicts Detected
+
+Task 3 and Task 7 show conflicting LP application:
+- Task 3: Applied `lp:judgment:readability_vs_performance` (prioritized readability)
+- Task 7: Applied conflicting performance optimization (ignored LP)
+
+Recommendation: Review LP scope conditions. May need context-dependent split.
+```
+
+### Report Quality Impact
+
+In the final report, include LP impact assessment:
+
+```markdown
+## LP System Impact
+
+**Positive**:
+- Consistent code style across {N} tasks (lp:defaults:language_choice applied)
+- No redundant confirmations (lp:communication:confirmation_frequency applied)
+
+**Quality Preservation**:
+- All absolute quality criteria met
+- No LP-caused correctness/security/safety issues
+- Test coverage maintained across all tasks
+
+**Recommendations**:
+- [None] OR [Specific LP scope adjustments if issues detected]
+```
+
+**Rationale**: Aggregator is uniquely positioned to detect cross-task LP patterns. Individual workers see only their task; aggregator sees the whole picture.
+
 ## Partial Result Handling
 
 When some tasks failed and their result files are missing or contain `status: failure`:

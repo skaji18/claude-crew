@@ -7,6 +7,19 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+
+#### Learned Preferences (LP) System
+- **LP Signal Detection** — Retrospector detects 4 signal types (course correction, afterthought supplement, rejection/revert, repeated specification) with N>=3 aggregation rule and weighted signal accumulation; signals trigger LP proposal generation (cmd_001)
+- **LP Search Integration** — Workers search for applicable learned preferences in Memory MCP during task execution via `mcp__memory__search_nodes(query="lp:")`; LP rules applied silently to guide decision-making on translation cost reduction (cmd_001)
+- **LP Approval Flow** — Unified approval workflow combining Memory MCP candidates and LP proposals in post-Phase 4 batch review; includes onboarding for first LP, natural language presentation, and batch limit of 3 LP candidates per session (cmd_001)
+- **LP Five Principles** — (1) Silent application, (2) Default not mandatory, (3) Absolute quality immutable, (4) Change tolerance, (5) No recording without approval (cmd_001)
+- **LP Quality Guardrails** — Dual-quality framework: absolute quality (correctness, completeness, security, safety, test coverage) is immutable; relative quality (style, design choices, report format, confirmation frequency) is LP-adjustable (cmd_001)
+- **LP Privacy Safeguards** — 8 forbidden categories (personality, emotional, schedule, productivity, health, political, relationships, financial); aggregate profile review at milestones (10, 20, 30); one-command reset via `lp_system.reset_all: true` (cmd_001)
+- **LP Validation Script** — `scripts/validate_lp.py` validates LP entity naming convention, observation format, privacy keywords, quality guardrails, and observation length (100-500 chars) (cmd_001)
+- **LP User Guide** — `docs/learned_preferences.md` comprehensive guide covering signal types, 6 clusters, 5 principles, quality scoring, approval workflow, privacy safeguards, FAQ, and lifecycle example (cmd_001)
+- **CLAUDE.md LP Section** — Added LP System overview, 5 principles, quality guardrails, 6 clusters, privacy protections, and integration points (cmd_001)
+
+### Added
 - **Phase 1.5 safe suffix stripping** — Automatic handling of safe suffix removal during path normalization to prevent false positives in permission fallback checks (cmd_047)
 - **Phase 7 general command auto-approval** — Extended auto-approval mechanism for common commands with path containment validation to streamline permission fallback processing (cmd_048)
 - **Memory MCP connection check in setup.sh** — Added verification of Memory MCP service connectivity during initialization to ensure knowledge graph functionality is available (cmd_049)
