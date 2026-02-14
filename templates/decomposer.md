@@ -273,6 +273,97 @@ Choose the cheapest model that can handle each task. Default to **haiku** and es
 
 > For the full Complexity Scoring Method, Model Assignment Rules, Mixed Model Strategy, and Decision Flowchart, see the `model-selection-guide` skill (`/model-selection-guide`).
 
+## Phase Instructions (Optional)
+
+The parent can provide phase-specific custom instructions via `config.yaml` that modify default behavior for decompose, execute, aggregate, or retrospect phases. These instructions are appended to phase prompts when non-empty.
+
+### Configuration Structure
+
+Phase instructions are defined in `config.yaml`:
+
+```yaml
+phase_instructions:
+  decompose: ""    # Appended to decomposer prompt
+  execute: ""      # Appended to all worker prompts
+  aggregate: ""    # Appended to aggregator prompt
+  retrospect: ""   # Appended to retrospector prompt
+```
+
+### Usage Patterns
+
+Phase instructions enable dynamic workflow adjustments without modifying templates. Use them for:
+- Progressive constraint relaxation across phases
+- Wave parallelization overrides
+- Cross-phase feedback integration
+- Model or tool restrictions for specific commands
+
+### Concrete Examples
+
+#### Example 1: Progressive Constraint Relaxation
+
+Use case: Read-only analysis in early phases, modification enabled in implementation phases.
+
+```yaml
+phase_instructions:
+  decompose: "Phase 1-2: Use only Read/Grep tools. No code modification allowed."
+  execute: "Phase 1-2: Analysis only. Phase 3+: Edit/Write tools enabled. Apply Phase 2 findings."
+```
+
+**Rationale**: Prevents premature implementation before design is validated. Reduces rework from early-stage changes.
+
+#### Example 2: Wave Parallelization Override
+
+Use case: 10+ independent tasks requiring maximum throughput.
+
+```yaml
+phase_instructions:
+  execute: "All tasks in this phase are independent. Maximize parallelization. Use max_parallel=8 for Wave 1."
+```
+
+**Rationale**: Overrides default Wave sizing when decomposer knows tasks have zero dependencies. Reduces total execution time from serial to parallel.
+
+#### Example 3: Feedback Integration Guidance
+
+Use case: Aggregator must synthesize cross-task patterns and highlight contradictions.
+
+```yaml
+phase_instructions:
+  aggregate: "Synthesize cross-viewpoint findings. Explicitly flag contradictions between task results. Provide reconciliation recommendations."
+```
+
+**Rationale**: Guides aggregator to go beyond simple concatenation. Useful for multi-analysis commands where viewpoints may conflict.
+
+#### Example 4: Model Restrictions for Cost Control
+
+Use case: Simple refactoring command where haiku is sufficient for all tasks.
+
+```yaml
+phase_instructions:
+  decompose: "All tasks are low-complexity file updates. Assign haiku to all workers."
+  execute: "Target: <5 minutes total execution. Prefer haiku unless task explicitly requires reasoning."
+```
+
+**Rationale**: Prevents unnecessary model escalation. Reduces per-cmd cost from ~$1.20 (sonnet) to ~$0.50 (haiku).
+
+#### Example 5: Custom Output Format
+
+Use case: Command produces API documentation requiring specific structure.
+
+```yaml
+phase_instructions:
+  execute: "All writer tasks: Use OpenAPI 3.1 format. Include examples for each endpoint."
+  aggregate: "Validate all result files against OpenAPI schema. Flag schema violations."
+```
+
+**Rationale**: Ensures consistent output format without modifying worker templates. Aggregator enforces quality gate.
+
+### Best Practices
+
+- **Keep instructions concise**: Each phase instruction should be 1-3 sentences. Long instructions indicate a need for custom templates, not phase_instructions.
+- **Phase-specific scope**: Instructions for `execute` apply to all workers in all waves. Use sparingly to avoid unintended side effects.
+- **Avoid contradicting templates**: Phase instructions augment templates, not replace them. Do not contradict core template rules (e.g., "skip YAML frontmatter").
+- **Document in plan.md**: When using phase_instructions, reference them in plan.md Risks section so workers understand context.
+
 ## Multi-Analysis Decomposition Pattern
 
 When the request matches multi-analysis criteria, apply the N-viewpoint parallel decomposition pattern defined in `templates/multi_analysis.md`.
@@ -370,9 +461,88 @@ This request exceeds recommended scope for a single cmd:
 Splitting reduces merge conflict risk and improves per-cmd quality by narrowing scope.
 ```
 
+### Handling Large Scope (15+ tasks)
+
+When task count exceeds 15, strongly consider splitting into multiple commands. Choose the splitting strategy based on task dependencies:
+
+#### Option 1: Sequential cmd split (dependency chain exists)
+
+Use when tasks have clear sequential dependencies (Phase A must complete before Phase B).
+
+**Example**:
+- `cmd_061`: Analysis + design (tasks 1-10)
+- `cmd_062`: Implementation wave 1 (tasks depending on cmd_061/results/)
+- `cmd_063`: Implementation wave 2 (tasks depending on cmd_062/results/)
+
+**Advantage**: Natural checkpoint boundaries for quality validation.
+
+#### Option 2: Parallel cmd split (independent workstreams)
+
+Use when task groups are fully independent with no cross-dependencies.
+
+**Example**: Large refactoring affecting 40 files
+- `cmd_061_docs`: Documentation tasks (15 tasks, personas/worker_writer)
+- `cmd_061_code`: Code implementation tasks (15 tasks, personas/worker_coder)
+- `cmd_061_tests`: Test creation tasks (10 tasks, personas/worker_coder)
+
+**Advantage**: Enables parallel execution across multiple cmd sessions.
+
+#### Splitting Decision Guidelines
+
+| Scenario | Recommended Split Strategy | Rationale |
+|----------|---------------------------|-----------|
+| Multi-phase architecture change | Sequential | Each phase informs the next; dependencies exist |
+| Cross-domain feature (docs + code + tests) | Parallel | Independent workstreams, minimal cross-references |
+| Incremental refactoring (40+ files) | Sequential batches | Reduces merge conflicts, enables gradual validation |
+
+**Reference to scope_warning YAML**: When proposing a split, update the `scope_warning` field to indicate the recommended approach:
+
+```yaml
+scope_warning: "45 tasks exceed single-cmd threshold. Recommend parallel split: cmd_062_docs (15 tasks) + cmd_062_code (20 tasks) + cmd_062_tests (10 tasks)"
+```
+
 ### When NOT to Add Warning
 
 If all three metrics are within thresholds, omit both the YAML `scope_warning` field and the Scope Warning section.
+
+## Consistency Maintenance (Large Commands)
+
+When a plan has 5+ waves or 10+ tasks with cross-file shared values, consistency drift becomes a critical risk. Values defined early in the execution may be revised in later waves, leaving upstream documents stale and creating integration issues.
+
+### Trigger Condition
+
+Apply these practices when:
+- **5+ waves** in the execution plan, OR
+- **10+ tasks** with cross-file shared values (naming conventions, numeric thresholds, enumeration lists)
+
+### Guidance
+
+1. **Define Canonical Values**: In plan.md, add a "Canonical Values" section listing all values that must be consistent across outputs:
+   ```markdown
+   ## Canonical Values
+   - Cluster naming convention: `task_scope` (not `implicit`)
+   - Signal weight threshold: 0.7
+   - Quality criteria: [5 standardized items]
+   ```
+
+2. **Include Consistency Checkpoints**: After any wave that revises a canonical value, add a checkpoint task to read all prior results and produce a reconciliation list identifying discrepancies.
+
+3. **Explicit Input Dependencies**: Subsequent waves receive the reconciliation list as an explicit input dependency, ensuring downstream tasks apply the updated values.
+
+### Example from cmd_056
+
+In a 10-wave command, canonical values drifted across waves:
+- Cluster name: `implicit` → `task_scope` (revised in Wave 5, not backported to Waves 1-4)
+- Signal weight: 0.5 → 0.7 (revised in Wave 6, inconsistent in prior outputs)
+- Quality list: 8 items → 5 items (standardized in Wave 8, older outputs not updated)
+
+Result: Integration review (Wave 9) found 2 BLOCKER and 8 IMPORTANT inconsistencies. A dedicated fix task (Wave 10, 221s) was required to correct drift across 6 result files.
+
+### Expected Impact
+
+Reduces cross-document inconsistencies from ~15 findings to near-zero by catching drift early and maintaining a shared source of truth.
+
+**Reference**: See cmd_056 retrospective.md IMP-001 for full context on this pattern.
 
 ## Task Granularity Optimization
 
