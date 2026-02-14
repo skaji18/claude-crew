@@ -2,6 +2,9 @@
 
 このドキュメントは claude-crew の Learned Preferences (LP) システムの利用ガイドです。LP は、AIとのやり取りから学習した「あなたの好み」を記録し、次回以降のセッションで自動的に反映することで、毎回同じことを説明する手間（翻訳コスト）を削減する機能です。
 
+> **Note**: The compact normative rules reference is `docs/lp_rules.md`.
+> This document provides the full user-facing guide with explanations and examples.
+
 ---
 
 ## 1. LP とは何か

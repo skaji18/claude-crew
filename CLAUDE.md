@@ -38,6 +38,7 @@ Conventional Commits for approved improvements (see `docs/parent_guide.md`).
 | Custom | `personas/*.md` | User-defined personas |
 | Aggregator | `templates/aggregator.md` | Result integration |
 | Retrospector | `templates/retrospector.md` | Post-mortem analysis |
+| LP Flush | `templates/lp_flush.md` | LP processing (Phase 4 skip) |
 | Multi-Analysis | `templates/multi_analysis.md` | N-viewpoint framework |
 
 Template usage: Pass TEMPLATE_PATH in prompt. Subagent reads template as first action. Parent does not read template content.
@@ -47,6 +48,11 @@ Template usage: Pass TEMPLATE_PATH in prompt. Subagent reads template as first a
 Search `mcp__memory__search_nodes` at task start.
 Write only via approval flow after Phase 4.
 Naming: `{domain}:{category}:{identifier}`
+
+## LP Signal Detection (Non-Crew Sessions)
+
+For non-crew sessions: run `/lp-check` before ending long sessions to capture LP signals.
+Full LP rules: `docs/lp_rules.md`
 
 ## Context Management
 

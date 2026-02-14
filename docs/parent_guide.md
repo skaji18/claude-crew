@@ -284,9 +284,39 @@ retrospector 完了後、親セッションは `work/cmd_xxx/retrospective.md` �
 - `skills_accepted` > 0 の場合: スキル化提案あり
 - 両方 0 の場合: 「構造的な改善点・スキル化候補は見つかりませんでした」と報告する
 
+#### LP Flush (Phase 4 スキップ時)
+
+Phase 4 がスキップされた場合（`retrospect.enabled: false` または手動スキップ）、
+かつ `lp_system.enabled: true` かつ `lp_system.collect_signals: true` の場合、
+LP 処理のみ軽量サブエージェントで実行する:
+
+1. LP Flush サブエージェントを起動する:
+   - テンプレートパス: `templates/lp_flush.md`
+   - Model: haiku
+   - max_turns: 15
+   - Input: WORK_DIR, RESULTS_DIR
+   - Output: `{WORK_DIR}/lp_flush_output.md`
+
+2. LP Flush 出力のメタデータ（先頭20行）を Read で確認する
+
+3. LP 候補が存在する場合:
+   - 一括承認フローに含めて提示する（Phase 4 経由と同じフォーマット）
+
+4. Signal log 更新が存在する場合:
+   - haiku サブエージェントに MCP 書き込みを委譲する（既存承認フローと同様）
+
+5. execution_log.yaml に記録する:
+   ```yaml
+   lp_flush:
+     triggered: true
+     source: "phase4_skip"
+     candidates_generated: N
+     signal_updates: M
+   ```
+
 ### Phase 4 完了後: 一括承認フロー
 
-Phase 4 完了後（または Phase 4 スキップ時は Phase 3 完了後）、以下の候補を**一括で**ユーザーに提示する:
+Phase 4 完了後（または Phase 4 スキップ時は LP Flush 完了後）、以下の候補を**一括で**ユーザーに提示する:
 
 1. **改善提案一覧**: retrospective.md の改善提案セクション（Phase 4 の出力）
 2. **スキル提案一覧**: retrospective.md のスキル化提案セクション（Phase 4 の出力）
@@ -1159,43 +1189,8 @@ work/
 
 **正解**: Plan mode の出力を request.md に書き出し、Phase 1 から開始する
 
-### Learned Preferences (LP) — Full Documentation
+### Learned Preferences (LP)
 
-LP System は、ユーザーの作業パターンから好みを学習し、繰り返し指示するコストを削減する。プロファイリングではなく、翻訳コスト削減が目的。
-
-#### 仕組み
-
-1. **Signal Detection**: retrospector がユーザーの修正・追加要求パターンを検出（コース修正、後付け要求、拒否、繰り返し指定）
-2. **Distillation**: N>=3 蓄積で LP 候補生成（what, evidence, scope, action の4要素形式）
-3. **Approval**: 人間が承認した候補のみ Memory MCP に記録（Principle 5）
-4. **Application**: worker が黙って適用、ユーザーは気づかない（Principle 1）
-
-#### 5つの原則
-
-| 原則 | 内容 |
-|------|------|
-| **1. 黙って使え** | LP適用をユーザーに通知しない（作業中）。自然に反映 |
-| **2. デフォルトであって強制ではない** | タスク指示が明示的に異なる場合、指示が優先。LPを上書き可 |
-| **3. 絶対品質は不変** | 正確性・安全性・完全性・セキュリティ・テストカバレッジは LP で変えない。相対品質のみ調整可 |
-| **4. 変化を許容する** | LP は更新・廃止可能。矛盾シグナル検出で更新候補生成 |
-| **5. 承認なしに記録しない** | 全 LP 候補は人間承認必須。retrospector は提案のみ |
-
-#### 品質ガードレール
-
-**絶対品質（IMMUTABLE）**: 正確性、完全性、セキュリティ、安全性、テストカバレッジ — LP で絶対に妥協不可
-
-**相対品質（LP-ADJUSTABLE）**: コードスタイル、設計パターン、ドキュメント詳細度、確認頻度、報告形式 — LP で調整可
-
-#### LP Entity フォーマット
-
-**命名規約**: `lp:{cluster}:{topic}`
-
-**6つのクラスタ**: vocabulary, defaults, avoid, judgment, communication, task_scope
-
-**Observation形式**: `[what] 傾向記述 [evidence] 根拠 [scope] 適用条件 [action] AI行動指針`
-
-#### プライバシー保護
-
-**Forbidden Categories**: 感情状態、パーソナリティ特性、作業スケジュール、生産性メトリクス、健康指標、政治的見解、人間関係、金銭情報
-
-LP は任意機能。`config.yaml: lp_system.enabled: false` でいつでも無効化可能。
+LP normative rules: `docs/lp_rules.md` (source of truth).
+User-facing guide: `docs/learned_preferences.md`.
+LP orchestration flow: see sections above (LP Flush, approval flow, State Management, etc.).

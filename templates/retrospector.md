@@ -157,6 +157,8 @@ Classify successes into these 6 categories:
 
 Generate skill/template proposals based on success analysis. Each proposal follows the format defined in the Proposal Format section.
 
+> Read `docs/lp_rules.md` for normative LP rules (principles, signal types, clusters, quality guardrails).
+
 ### Step 8.5: Detect Learned Preference Signals and Generate LP Candidates (full and light modes)
 
 **NEW STEP**: Analyze conversation patterns to detect user preferences worth learning.
@@ -165,14 +167,9 @@ Generate skill/template proposals based on success analysis. Each proposal follo
 
 **CRITICAL**: Use SEMANTIC ANALYSIS, not keyword matching. You are an AI agent with judgment — analyze the MEANING of user corrections, not just surface patterns.
 
-Identify 4 signal types by analyzing conversation context:
+Identify 4 signal types by analyzing conversation context.
 
-| Signal Type | Weight | Semantic Indicators (Japanese) | Semantic Indicators (English) |
-|-------------|:------:|--------------------------------|-------------------------------|
-| **Course Correction** | 1.0 | ユーザーがAIのアプローチを修正 | User redirects AI's approach/method |
-| **Afterthought Supplement** | 0.7 | タスク完了後に暗黙期待を追加 | User adds implicit expectation post-task |
-| **Rejection/Revert** | 1.0 | AIの行動を明示的に却下/復元 | User explicitly rejects/reverts AI action |
-| **Repeated Specification** | 0.7 | 独立セッション間で同じ指示 | Same instruction across independent sessions |
+Signal types and weights: see `docs/lp_rules.md` § Signal Types.
 
 **重み付き蓄積**: 各信号の重みをカウンタに加算。合計 >= 3.0 でLP候補化。詳細は 8.5.2 参照。
 
@@ -313,40 +310,15 @@ For each topic with counter >= 3.0:
 
 #### 8.5.4: Quality Guardrails
 
-**Absolute Quality Filter** (MANDATORY):
+Quality guardrails (absolute vs adjustable): see `docs/lp_rules.md` § Quality Guardrails.
 
-NEVER propose LP candidates that compromise:
-- Correctness (code does what it's supposed to)
-- Completeness (all requested functionality delivered)
-- Security (no vulnerabilities)
-- Safety (no data loss, no breaking production)
-- Test coverage for critical paths
-
-**Forbidden LP examples**:
-- "User prefers skipping tests"
-- "User accepts incomplete implementations"
-- "User is okay with potential data loss"
-
-**Allowed LP examples**:
-- "User prefers concise test descriptions" (style choice, not coverage reduction)
-- "User prefers delivering minimal scope first, then iterating" (valid strategy)
-- "User accepts slower performance for readability in non-critical paths" (valid tradeoff)
+**Key rule**: NEVER propose LP candidates that compromise absolute quality (correctness, completeness, security, safety, test coverage).
 
 #### 8.5.5: LP Cluster Assignment
 
 Assign each LP candidate to one of 6 clusters:
 
-| Cluster | Definition | Example Topic |
-|---------|------------|---------------|
-| `vocabulary` | How user defines ambiguous terms | "simplicity", "properly", "clean up" |
-| `defaults` | Values user repeatedly specifies | language_choice, test_framework |
-| `avoid` | Things user consistently rejects | linter_changes, premature_abstraction |
-| `judgment` | Tradeoff decision patterns | readability_vs_performance, dry_vs_explicit |
-| `communication` | Interaction style preferences | confirmation_frequency, report_verbosity |
-| `task_scope` | Task-scope expansion patterns | modification_scope, documentation_update |
-
-**Naming convention**: `lp:{cluster}:{topic}`
-- Example: `lp:vocabulary:simplicity`, `lp:defaults:language_choice`, `lp:avoid:linter_changes`
+Clusters and naming convention: see `docs/lp_rules.md` § Clusters and § Entity Format.
 
 #### 8.5.6: Check Existing LPs for Contradictions
 

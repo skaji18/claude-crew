@@ -49,6 +49,8 @@ YAMLブロックの後に続く本文は各workerのペルソナに応じて異�
 
 ## Learned Preferences (LP) — Optional
 
+Read `docs/lp_rules.md` (LP normative rules, ~40 lines).
+
 **タスク開始時**: `mcp__memory__search_nodes(query="lp:")` を実行し、関連するLP(学習済み好み)があれば取得せよ。LPは以下の形式で記録されている:
 
 ```
@@ -60,10 +62,10 @@ YAMLブロックの後に続く本文は各workerのペルソナに応じて異�
 [what] Linter/formatter設定ファイルは変更しない [evidence] AI提案の設定変更を3回revert [scope] Universal [action] Linter/formatter設定変更は絶対に行わない。必要な場合は明示的な許可を求める
 ```
 
-**適用原則**:
-1. **黙って使え（作業中）**: LP適用をユーザーに通知しない。自然に反映せよ。**ただし例外**: ユーザーが「なぜXをしたのか？」と直接質問した場合、LPの影響を簡潔に説明してよい（"以前の好みに基づいて〜"程度）
-2. **デフォルトであって強制ではない**: タスク指示が明示的に異なる要求をした場合、タスク指示が優先。LPを上書き
-3. **絶対品質は不変**: 正確性・安全性・完全性・セキュリティ・テストカバレッジはLPで変えてはならない。LPで調整可能なのは相対品質のみ(スタイル、設計選択、報告形式、確認頻度等)
+**Principles**: See `docs/lp_rules.md`. Key points for workers:
+- Silent application (don't announce LP use)
+- Task instructions override LP
+- Never compromise absolute quality (correctness/security/safety/completeness/test coverage)
 
 **使い方**:
 - `[scope]` を確認し、**現在のプロジェクト・タスクタイプ・技術スタックに関連するか判定**
