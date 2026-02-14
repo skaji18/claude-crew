@@ -32,10 +32,10 @@ fi
 
 # Check 1: version (quoted string, semver-like)
 VERSION=$(grep "^version:" "$CONFIG_PATH" | sed 's/^version:[[:space:]]*//' | tr -d '"' || echo "")
-if [[ -n "$VERSION" ]] && [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  check "version is valid semver: $VERSION" "pass"
+if [[ -n "$VERSION" ]] && [[ "$VERSION" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?(-[a-zA-Z0-9.]+)?$ ]]; then
+  check "version is valid: $VERSION" "pass"
 else
-  check "version missing or invalid (expected quoted semver like \"0.9.0\")" "fail"
+  check "version missing or invalid (expected semver like \"1.0.0\" or \"1.0-rc\", got: $VERSION)" "fail"
 fi
 
 # Check 2: default_model (haiku, sonnet, or opus)

@@ -1115,3 +1115,59 @@ work/
     ├── report_summary.md     … 集約役の出力（要約版・≤50行・親が読む）
     └── retrospective.md      … 回顧役の出力（改善提案書・Phase 4で生成）
 ```
+
+## CLAUDE.md Supplement (Parent-Only Context)
+
+以下のセクションは CLAUDE.md からトークン削減のため移動された。親セッション向けの詳細ルール。サブエージェントは各テンプレートに個別の指示を持つため、これらの情報を必要としない。
+
+### よくある間違い
+
+**間違い**: 親セッションが「単純なタスクだから」と判断して直接 Edit/Write を使う
+
+**問題点**:
+- 成果物に YAML frontmatter が付かず、Phase 4 のメタデータバリデーションで失敗する
+- execution_log.yaml にサブエージェント実行記録が残らず、追跡不能になる
+- 並列実行の利点が失われ、複数ファイルの変更が直列化される
+
+**正解**: 例外条件に該当しない限り、必ず decomposer を起動してタスク分解を行う
+
+### Learned Preferences (LP) — Full Documentation
+
+LP System は、ユーザーの作業パターンから好みを学習し、繰り返し指示するコストを削減する。プロファイリングではなく、翻訳コスト削減が目的。
+
+#### 仕組み
+
+1. **Signal Detection**: retrospector がユーザーの修正・追加要求パターンを検出（コース修正、後付け要求、拒否、繰り返し指定）
+2. **Distillation**: N>=3 蓄積で LP 候補生成（what, evidence, scope, action の4要素形式）
+3. **Approval**: 人間が承認した候補のみ Memory MCP に記録（Principle 5）
+4. **Application**: worker が黙って適用、ユーザーは気づかない（Principle 1）
+
+#### 5つの原則
+
+| 原則 | 内容 |
+|------|------|
+| **1. 黙って使え** | LP適用をユーザーに通知しない（作業中）。自然に反映 |
+| **2. デフォルトであって強制ではない** | タスク指示が明示的に異なる場合、指示が優先。LPを上書き可 |
+| **3. 絶対品質は不変** | 正確性・安全性・完全性・セキュリティ・テストカバレッジは LP で変えない。相対品質のみ調整可 |
+| **4. 変化を許容する** | LP は更新・廃止可能。矛盾シグナル検出で更新候補生成 |
+| **5. 承認なしに記録しない** | 全 LP 候補は人間承認必須。retrospector は提案のみ |
+
+#### 品質ガードレール
+
+**絶対品質（IMMUTABLE）**: 正確性、完全性、セキュリティ、安全性、テストカバレッジ — LP で絶対に妥協不可
+
+**相対品質（LP-ADJUSTABLE）**: コードスタイル、設計パターン、ドキュメント詳細度、確認頻度、報告形式 — LP で調整可
+
+#### LP Entity フォーマット
+
+**命名規約**: `lp:{cluster}:{topic}`
+
+**6つのクラスタ**: vocabulary, defaults, avoid, judgment, communication, task_scope
+
+**Observation形式**: `[what] 傾向記述 [evidence] 根拠 [scope] 適用条件 [action] AI行動指針`
+
+#### プライバシー保護
+
+**Forbidden Categories**: 感情状態、パーソナリティ特性、作業スケジュール、生産性メトリクス、健康指標、政治的見解、人間関係、金銭情報
+
+LP は任意機能。`config.yaml: lp_system.enabled: false` でいつでも無効化可能。

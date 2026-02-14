@@ -98,7 +98,7 @@ When user invokes `/refine-iteratively [task] [options]`:
    - Create output directory with timestamp by calling: `bash .claude/skills/refine-iteratively/scripts/init_refine_dir.sh {output-dir}`
      - This script creates `{output-dir}/refine_{timestamp}/` with required subdirectories (results/, feedback/, logs/)
      - Returns the created directory path via stdout
-     - NOTE: Using this script (located in `*/scripts/*`) enables automatic permission approval via permission-fallback.sh hook
+     - NOTE: Using this script (located in `*/scripts/*`) enables automatic permission approval via permission-fallback hook
    - Copy task description to `task.md` in output directory
    - Initialize `execution_log.yaml` with task metadata in the logs/ subdirectory
 

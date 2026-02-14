@@ -1,5 +1,5 @@
 #!/bin/bash
-# Test corpus for permission-fallback.sh hook validation
+# Test corpus for permission-fallback hook validation
 #
 # Usage: ./scripts/test_permission_hook.sh
 #
@@ -10,7 +10,14 @@
 
 set -euo pipefail
 
-HOOK_PATH="${HOOK_PATH:-.claude/hooks/permission-fallback.sh}"
+# Support both new (extensionless) and legacy (.sh) hook paths
+if [[ -z "${HOOK_PATH:-}" ]]; then
+  if [[ -x ".claude/hooks/permission-fallback" ]]; then
+    HOOK_PATH=".claude/hooks/permission-fallback"
+  else
+    HOOK_PATH=".claude/hooks/permission-fallback.sh"
+  fi
+fi
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 # Colors for output

@@ -511,7 +511,7 @@ This prevents repeatedly proposing the same type of improvement the user has alr
 1. **cmd_NNN参照**: 特定のcmd IDへの言及がある（例: "cmd_030で確立した"）。パターンとして昇華してからのみ記録可
 2. **内部アーキテクチャ記述**: decomposer, aggregator, parent session, Phase 1/2/3/4, execution_log 等のclaude-crew内部処理の記述。内部処理はテンプレート改善（IMP-NNN）で対処せよ
 3. **Claudeの事前学習知識**: OWASP, NIST, CVE等の公知情報で、プロジェクト固有の文脈や検証結果がないもの
-4. **環境設定の重複**: CLAUDE.md, config.yaml, .claude/settings.json に既に記載されている情報
+4. **環境設定の重複**: config.yaml, .claude/settings.json, docs/parent_guide.md に既に記載されている情報
 5. **未昇華の失敗/成功**: 教訓や判断基準に変換されていない事実記録（例: "Task 3が失敗した", "cmd_025でうまくいった"）
 6. **過度な抽象化**: 具体的な行動指針に落とせない一般論（例: "品質を高めよう", "タスク分解は重要"）
 

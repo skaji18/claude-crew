@@ -32,7 +32,7 @@ The parent session directly manages all sub-agents. Sub-agents cannot spawn othe
 - **File-based communication** — Sub-agents read from and write to files. The parent passes paths, not content, keeping its context window lean.
 - **Up to 10 parallel sub-agents** — Launch multiple workers simultaneously for independent tasks.
 - **Persona switching** — Each worker can adopt a specialized role: researcher, coder, reviewer, or a custom persona defined by templates.
-- **Permission-based safety** — Claude Code's built-in permission system applies to all sub-agents, with a PermissionRequest hook (permission-fallback.sh) that dynamically approves python3/bash/sh execution of scripts under scripts/ directories via an 8-phase validation pipeline. No `--dangerously-skip-permissions` required.
+- **Permission-based safety** — Claude Code's built-in permission system applies to all sub-agents, with a PermissionRequest hook (permission-fallback) that dynamically approves python3/bash/sh execution of scripts under scripts/ directories via an 8-phase validation pipeline. No `--dangerously-skip-permissions` required.
 - **Single-cycle completion** — A typical request (decompose → execute → aggregate → retrospect) completes within one context window, no compaction needed.
 - **Model flexibility** — Assign `haiku` for simple tasks, `sonnet` for balanced work, `opus` for complex reasoning — per sub-agent.
 
@@ -59,13 +59,15 @@ claude-crew/
 ├── README.md                  # This file
 ├── config.yaml                # Runtime configuration
 ├── CHANGELOG.md               # Version history
+├── .mcp.json                  # MCP server configuration (Memory MCP)
 ├── docs/
-│   └── parent_guide.md        # Detailed parent session processing guide
+│   ├── parent_guide.md        # Detailed parent session processing guide
+│   └── learned_preferences.md # LP system design and specification
 ├── .claude/
 │   ├── settings.json          # Permission settings for sub-agents
 │   └── hooks/
-│       ├── permission-fallback.sh      # PermissionRequest hook for dynamic approval (8-phase validation, bash 3.2 compatible)
-│       └── test-permission-fallback.sh # Test suite for permission-fallback.sh (156 security regression tests)
+│       ├── permission-fallback          # PermissionRequest hook for dynamic approval (8-phase validation pipeline, Python 3)
+│       └── test-permission-fallback.sh # Test suite for permission-fallback (190+ security regression tests)
 ├── templates/
 │   ├── decomposer.md          # Task decomposition template
 │   ├── worker_common.md       # Shared rules for all worker personas
@@ -85,8 +87,9 @@ claude-crew/
 │   ├── setup.sh               # Prerequisites check + Memory MCP connection test
 │   ├── smoke_test.sh          # End-to-end infrastructure test
 │   ├── stats.sh               # Parse execution logs for success rates
-│   ├── test_permission_hook.sh # Test suite for permission-fallback.sh
+│   ├── test_permission_hook.sh # Test suite for permission-fallback
 │   ├── validate_config.sh     # Validate config.yaml fields and types
+│   ├── validate_lp.py         # LP entity format validation
 │   ├── validate_result.sh     # Result file validation (JSON output)
 │   └── visualize_plan.sh      # Generate Mermaid diagram from plan.md
 └── work/
@@ -211,6 +214,8 @@ The framework includes utility scripts for validation, testing, and analysis:
 | `analyze_patterns.sh` | Extract workflow patterns from execution logs | `bash scripts/analyze_patterns.sh [output_path]` |
 | `new_cmd.sh` | Create new cmd directory atomically | `bash scripts/new_cmd.sh` |
 | `health_check.sh` | Basic file structure validation | `bash scripts/health_check.sh` |
+| `test_permission_hook.sh` | Test suite for permission-fallback hook | `bash scripts/test_permission_hook.sh` |
+| `validate_lp.py` | LP entity format validation | `python3 scripts/validate_lp.py --help` |
 
 All scripts follow bash best practices (`set -euo pipefail`) and include usage documentation in their headers.
 

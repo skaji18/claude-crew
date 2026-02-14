@@ -74,13 +74,17 @@ else
   check "settings.json not found" "fail"
 fi
 
-# Check 4: permission-fallback.sh is executable
-if [[ -x "$PROJECT_ROOT/.claude/hooks/permission-fallback.sh" ]]; then
+# Check 4: permission-fallback hook is executable
+# Supports both permission-fallback (Python) and permission-fallback.sh (legacy)
+if [[ -x "$PROJECT_ROOT/.claude/hooks/permission-fallback" ]]; then
+  echo "[4/10] permission-fallback is executable ... PASS"
+  check "permission-fallback" "pass"
+elif [[ -x "$PROJECT_ROOT/.claude/hooks/permission-fallback.sh" ]]; then
   echo "[4/10] permission-fallback.sh is executable ... PASS"
   check "permission-fallback.sh" "pass"
 else
-  echo "[4/10] permission-fallback.sh is executable ... FAIL"
-  check "permission-fallback.sh not executable or missing" "fail"
+  echo "[4/10] permission-fallback hook is executable ... FAIL"
+  check "permission-fallback hook not executable or missing" "fail"
 fi
 
 # Check 5: jq is installed

@@ -29,7 +29,7 @@ After reading the request, search Memory MCP for past patterns **before** decomp
 
 ### Entity Naming Convention
 
-Memory MCP entities follow the `{domain}:{category}:{identifier}` naming convention. See CLAUDE.md "Memory MCP候補の品質基準" section for details.
+Memory MCP entities follow the `{domain}:{category}:{identifier}` naming convention. See `docs/parent_guide.md` "Memory MCP候補の品質基準" section for quality criteria details.
 
 ### Applying Past Patterns
 

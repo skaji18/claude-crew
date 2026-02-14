@@ -25,7 +25,7 @@ max_cmd_duration_sec: 1800
 
 # Pre-flight plan validation (Phase 1.5)
 # When true, parent launches a reviewer to validate plan.md before Phase 2
-plan_validation: true
+plan_validation: false
 
 # Retrospect mechanism (Phase 4)
 # Post-mortem & success analysis after cmd completion

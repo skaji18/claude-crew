@@ -1,12 +1,16 @@
 #!/bin/bash
 # .claude/hooks/test-hooks-support.sh
 #
-# Test script to verify that .claude/hooks/ scripts are allowed by permission-fallback.sh
+# Test script to verify that .claude/hooks/ scripts are allowed by permission-fallback
 # Usage: bash .claude/hooks/test-hooks-support.sh
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-HOOK="$SCRIPT_DIR/permission-fallback.sh"
+if [[ -x "$SCRIPT_DIR/permission-fallback" ]]; then
+  HOOK="$SCRIPT_DIR/permission-fallback"
+else
+  HOOK="$SCRIPT_DIR/permission-fallback.sh"
+fi
 PASS=0; FAIL=0
 
 test_case() {

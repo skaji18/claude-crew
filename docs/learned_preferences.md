@@ -675,5 +675,5 @@ AI: （黙って依存削減を優先した実装を提示）
 ---
 
 **関連ドキュメント**:
-- `CLAUDE.md` — LP System の概要（5つの原則、品質ガードレール、6クラスタ）
+- `docs/parent_guide.md` — LP System の概要（5つの原則、品質ガードレール、6クラスタ）
 - `docs/parent_guide.md` — 親セッションのLP承認フロー

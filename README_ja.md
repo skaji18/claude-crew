@@ -32,7 +32,7 @@ claude-crewは、1つのClaude Codeセッションを複数のサブエージェ
 - **ファイルベースの通信** — サブエージェントはファイルを読み書きして連携する。親はパスだけを渡し、コンテキストウィンドウを軽量に保つ。
 - **最大10並列のサブエージェント** — 独立したタスクに対して複数のWorkerを同時に起動できる。
 - **ペルソナ切り替え** — 各Workerはリサーチャー、コーダー、レビュアーなどの専門的な役割を担当可能。テンプレートでカスタムペルソナも定義できる。
-- **パーミッションによる安全性** — Claude Code標準のパーミッションシステムが全サブエージェントに適用される。PermissionRequest hook (permission-fallback.sh) により、scripts/ 配下のpython3/bash/shスクリプト実行を6段階検証パイプライン（bash 3.2互換）で動的に承認する。`--dangerously-skip-permissions` は不要。
+- **パーミッションによる安全性** — Claude Code標準のパーミッションシステムが全サブエージェントに適用される。PermissionRequest hook (permission-fallback) により、scripts/ 配下のpython3/bash/shスクリプト実行を8段階検証パイプラインで動的に承認する。`--dangerously-skip-permissions` は不要。
 - **1サイクル完結** — 一般的なリクエスト（分解→実行→集約→回顧）は1つのコンテキストウィンドウ内で完了し、コンパクションは不要。
 - **モデルの柔軟な選択** — サブエージェントごとに、軽い作業には `haiku`、標準的な作業には `sonnet`、複雑な推論には `opus` を割り当てられる。
 
@@ -59,13 +59,15 @@ claude-crew/
 ├── README.md                  # 英語版README
 ├── config.yaml                # 実行時設定
 ├── CHANGELOG.md               # 変更履歴
+├── .mcp.json                  # MCPサーバー設定（Memory MCP）
 ├── docs/
-│   └── parent_guide.md        # 親セッション詳細処理ガイド
+│   ├── parent_guide.md        # 親セッション詳細処理ガイド
+│   └── learned_preferences.md # LPシステム設計・仕様書
 ├── .claude/
 │   ├── settings.json          # サブエージェントのパーミッション設定
 │   └── hooks/
-│       ├── permission-fallback.sh      # PermissionRequest hook（6段階検証パイプライン、bash 3.2互換）
-│       └── test-permission-fallback.sh # permission-fallback.sh のテストスイート（40+セキュリティ回帰テスト）
+│       ├── permission-fallback          # PermissionRequest hook（8段階検証パイプライン、Python 3）
+│       └── test-permission-fallback.sh # permission-fallback のテストスイート（190+セキュリティ回帰テスト）
 ├── templates/
 │   ├── decomposer.md          # タスク分解テンプレート
 │   ├── worker_common.md       # 全workerペルソナ共通ルール
@@ -86,6 +88,8 @@ claude-crew/
 │   ├── visualize_plan.sh      # plan.mdからMermaid図を生成
 │   ├── analyze_patterns.sh    # 実行ログからワークフローパターンを抽出
 │   ├── new_cmd.sh             # Atomic cmd directory creation
+│   ├── test_permission_hook.sh # permission-fallbackフックのテストスイート
+│   ├── validate_lp.py         # LP エンティティのフォーマット検証
 │   └── health_check.sh        # 基本的なファイル構造検証
 ├── personas/                  # カスタムペルソナディレクトリ（オプション）
 └── work/
@@ -207,6 +211,8 @@ work/
 | `analyze_patterns.sh` | 実行ログからワークフローパターンを抽出 | `bash scripts/analyze_patterns.sh [output_path]` |
 | `new_cmd.sh` | 新規cmdディレクトリをアトミックに作成 | `bash scripts/new_cmd.sh` |
 | `health_check.sh` | 基本的なファイル構造検証 | `bash scripts/health_check.sh` |
+| `test_permission_hook.sh` | permission-fallbackフックのテストスイート | `bash scripts/test_permission_hook.sh` |
+| `validate_lp.py` | LPエンティティのフォーマット検証 | `python3 scripts/validate_lp.py --help` |
 
 すべてのスクリプトはbashベストプラクティス（`set -euo pipefail`）に従い、ヘッダーに使用方法のドキュメントが含まれている。
 
