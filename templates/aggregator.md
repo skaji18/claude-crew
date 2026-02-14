@@ -30,16 +30,20 @@ The parent provides:
    - Quality impact: any FUNDAMENTAL conflict → minimum quality YELLOW. Unresolvable → YELLOW with resolution recommendation
    - When processing partial results (F08): do NOT flag missing perspectives as conflicts. Note incomplete coverage due to failed tasks instead.
 7. Collect Memory MCP candidates: check each result file for a `## Memory MCP追加候補` section. If found, gather all candidates and include a `## Memory MCP追加候補（統合）` section in the report (grouped by worker). If no candidates exist, write `Memory MCP追加候補: なし`
-8. Quality Review: cross-check all result files for quality issues:
+8. Aggregate doc_impact: check each result file's YAML frontmatter for the `doc_impact` field. Collect all non-empty entries across all results. If any doc_impact items exist:
+   - Add a "Doc Impact" subsection within the "Issues & Risks" section of the report
+   - List each documented impact as a bullet point
+   - If all doc_impact fields are empty, skip this subsection
+9. Quality Review: cross-check all result files for quality issues:
    - **Consistency**: Do results contradict each other in numbers, terms, or conclusions?
    - **Evidence**: Are claims backed by sources or verified file references? Flag unverified assertions.
    - **Task compliance**: Does each result_N.md address the requirements in its corresponding task_N.md?
    Assign a Quality Level: GREEN (no issues), YELLOW (MAJOR or below), RED (CRITICAL issues found).
-9. Write the report to `REPORT_PATH`. Include version metadata as fields in the YAML frontmatter:
+10. Write the report to `REPORT_PATH`. Include version metadata as fields in the YAML frontmatter:
    - `generated_by`: `"claude-crew v{version}"` (`{version}` from `config.yaml`)
    - `date`: current date (`YYYY-MM-DD`)
    - `cmd_id`: extracted from the work directory name (e.g., `cmd_001`)
-10. Write the summary to `REPORT_SUMMARY_PATH` (≤50 lines). Format:
+11. Write the summary to `REPORT_SUMMARY_PATH` (≤50 lines). Format:
    ```markdown
    ---
    (same YAML frontmatter as report.md)
@@ -58,7 +62,7 @@ The parent provides:
    ## Memory MCP Candidates
    - 候補数: N件（詳細は report.md を参照）
    ```
-11. Verify both report files exist (use Glob or ls on `REPORT_PATH` and `REPORT_SUMMARY_PATH`). If not found, retry Write
+12. Verify both report files exist (use Glob or ls on `REPORT_PATH` and `REPORT_SUMMARY_PATH`). If not found, retry Write
 
 ## Output Format
 

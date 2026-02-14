@@ -19,10 +19,13 @@ warnings: []             # warning list (optional, [] if none)
 output_files:            # list of generated files (optional)
   - result_N.md
 task_id: N               # task number (required)
+doc_impact: []           # ドキュメント影響リスト (optional, [] if none)
 ---
 ```
 
 YAMLブロックの後に続く本文は各workerのペルソナに応じて異なる。
+
+`doc_impact` フィールドには、この変更が影響する可能性のあるドキュメントを自然言語で記載する。影響がない場合は空リスト `[]` のままでよい。
 
 ## Memory MCP追加候補 (共通)
 
