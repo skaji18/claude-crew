@@ -13,6 +13,13 @@ import re
 import os
 from pathlib import PurePosixPath
 
+# Conditional YAML import (needed for config loading)
+try:
+    import yaml
+    HAS_YAML = True
+except ImportError:
+    HAS_YAML = False
+
 # --- Configuration ---
 PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 DEBUG = os.getenv("PERMISSION_DEBUG", "0") == "1"
@@ -37,10 +44,22 @@ def reject(reason="unknown"):
 
 
 def load_config():
-    """Load permission-config.json or return hardcoded defaults."""
-    config_path = os.path.join(os.path.dirname(__file__), "permission-config.json")
+    """Load permission-config.yaml with optional local overlay."""
+    config_dir = os.path.dirname(__file__)
+    project_dir = os.path.abspath(os.path.join(config_dir, "../.."))
+    config_path = os.path.join(config_dir, "permission-config.yaml")
+    local_path = os.path.join(project_dir, "local", "hooks", "permission-config.yaml")
 
-    # Hardcoded defaults (bash version equivalent)
+    # Security floor: items that can NEVER be removed
+    FLOOR_ALWAYS_ASK = {"sudo", "su", "rm", "rmdir"}
+    FLOOR_SUBCOMMAND_ASK = {
+        "git:push", "git:reset:--hard", "gh:pr:merge",
+    }
+
+    # FROZEN: interpreters key cannot be overridden (Fix 1)
+    FROZEN_KEYS = {"interpreters"}
+
+    # Hardcoded defaults (unchanged from current code)
     default_config = {
         "interpreters": {
             "python3": {
@@ -60,18 +79,12 @@ def load_config():
             }
         },
         "always_ask": [
-            # Network
             "curl", "wget", "ssh", "scp", "rsync", "nc",
-            # Privilege
             "sudo", "su",
-            # Execution wrappers
             "eval", "exec", "xargs", "env", "nohup", "timeout",
             "busybox", "screen", "tmux", "script",
-            # Package managers
             "pip", "pip3", "npm", "apt", "apt-get",
-            # Other interpreters
             "node", "perl", "ruby", "php",
-            # Destructive operations
             "rm", "rmdir", "mv", "cp"
         ],
         "subcommand_ask": [
@@ -88,19 +101,98 @@ def load_config():
         "allowed_dirs_extra": []
     }
 
-    # Try to load JSON config
+    # Layer 1: Load committed config (overrides defaults)
     if os.path.exists(config_path):
+        if not HAS_YAML:
+            if DEBUG:
+                print(f"PyYAML not installed, using defaults", file=sys.stderr)
+            return default_config
         try:
             with open(config_path, 'r') as f:
-                user_config = json.load(f)
-                # Merge user config with defaults (user overrides defaults)
-                for key in user_config:
-                    default_config[key] = user_config[key]
-        except (json.JSONDecodeError, IOError) as e:
+                user_config = yaml.safe_load(f)
+                if user_config:
+                    for key in user_config:
+                        default_config[key] = user_config[key]
+        except (Exception) as e:
             if DEBUG:
                 print(f"Config load failed: {e}, using defaults", file=sys.stderr)
-            # Fail closed on parse error
             reject("config_parse_error")
+
+    # Layer 2: Merge local overlay (if exists)
+    if os.path.exists(local_path):
+        if not HAS_YAML:
+            if DEBUG:
+                print(f"PyYAML not installed, ignoring local overlay", file=sys.stderr)
+            return default_config
+        try:
+            with open(local_path, 'r') as f:
+                local = yaml.safe_load(f)
+        except (Exception) as e:
+            if DEBUG:
+                print(f"Local config load failed: {e}, ignoring overlay", file=sys.stderr)
+            return default_config
+
+        if not isinstance(local, dict):
+            if DEBUG:
+                print(f"Local config is not a YAML mapping, ignoring overlay", file=sys.stderr)
+            return default_config
+
+        # Fix 1: Skip frozen keys entirely
+        for key in FROZEN_KEYS:
+            if key in local:
+                if DEBUG:
+                    print(
+                        f"WARNING: '{key}' is frozen, cannot be overridden. Ignoring.",
+                        file=sys.stderr,
+                    )
+
+        # always_ask: union + floor enforced + null safety (Fix 3)
+        if 'always_ask' in local:
+            merged_set = set(default_config.get('always_ask', []))
+            local_value = local['always_ask']
+            if isinstance(local_value, list):
+                merged_set |= set(local_value)
+            elif local_value is not None:
+                if DEBUG:
+                    print(
+                        f"WARNING: always_ask expected array, got "
+                        f"{type(local_value).__name__}. Ignoring.",
+                        file=sys.stderr,
+                    )
+            # null is treated as empty (no additions, no crash)
+            merged_set |= FLOOR_ALWAYS_ASK
+            default_config['always_ask'] = sorted(merged_set)
+
+        # subcommand_ask: union + floor enforced + null safety (Fix 3)
+        if 'subcommand_ask' in local:
+            merged_set = set(default_config.get('subcommand_ask', []))
+            local_value = local['subcommand_ask']
+            if isinstance(local_value, list):
+                merged_set |= set(local_value)
+            elif local_value is not None:
+                if DEBUG:
+                    print(
+                        f"WARNING: subcommand_ask expected array, got "
+                        f"{type(local_value).__name__}. Ignoring.",
+                        file=sys.stderr,
+                    )
+            merged_set |= FLOOR_SUBCOMMAND_ASK
+            default_config['subcommand_ask'] = sorted(merged_set)
+
+        # allowed_dirs_extra: union (append-only) + null safety (Fix 3)
+        if 'allowed_dirs_extra' in local:
+            base_dirs = set(default_config.get('allowed_dirs_extra', []))
+            local_value = local['allowed_dirs_extra']
+            if isinstance(local_value, list):
+                base_dirs |= set(local_value)
+            elif local_value is not None:
+                if DEBUG:
+                    print(
+                        f"WARNING: allowed_dirs_extra expected array, got "
+                        f"{type(local_value).__name__}. Ignoring.",
+                        file=sys.stderr,
+                    )
+            default_config['allowed_dirs_extra'] = sorted(base_dirs)
 
     return default_config
 

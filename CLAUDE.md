@@ -15,6 +15,9 @@ See `docs/parent_guide.md` for full rules, exception list, and role restrictions
 ## Config
 
 `config.yaml` required. Stop on missing.
+Parent reads `work/cmd_NNN/config.yaml` (merged by `new_cmd.sh`).
+If `local/config.yaml` exists, it is deep-merged into the work copy at cmd start.
+Permission hook reads `local/hooks/permission-config.yaml` directly at runtime.
 
 ## Version
 

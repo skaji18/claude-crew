@@ -8,7 +8,16 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-CONFIG_PATH="$PROJECT_ROOT/config.yaml"
+
+# Determine config path: use work_dir merged config if provided, else base
+if [[ -n "${1:-}" ]] && [[ -f "$1/config.yaml" ]]; then
+  CONFIG_PATH="$1/config.yaml"
+elif [[ -n "${1:-}" ]] && [[ -f "$PROJECT_ROOT/$1/config.yaml" ]]; then
+  CONFIG_PATH="$PROJECT_ROOT/$1/config.yaml"
+else
+  CONFIG_PATH="$PROJECT_ROOT/config.yaml"
+fi
+
 PASS=0; FAIL=0
 
 check() {
@@ -110,6 +119,24 @@ elif [[ "$MAX_CMD_DUR" =~ ^[0-9]+$ ]] && [[ $MAX_CMD_DUR -gt 0 ]]; then
   check "max_cmd_duration_sec is valid: $MAX_CMD_DUR" "pass"
 else
   check "max_cmd_duration_sec invalid (expected positive integer, got: $MAX_CMD_DUR)" "fail"
+fi
+
+# Check 11: local/config.yaml override validation (if exists and merge script available)
+if [[ -f "$PROJECT_ROOT/local/config.yaml" ]]; then
+  if python3 -c "import yaml" 2>/dev/null; then
+    TMPDIR=$(mktemp -d)
+    MERGE_WARNINGS=$(python3 "$PROJECT_ROOT/scripts/merge_config.py" \
+      "$TMPDIR" 2>&1 >/dev/null) || true
+    rm -rf "$TMPDIR"
+    if [[ -n "$MERGE_WARNINGS" ]]; then
+      check "local/config.yaml override validation" "fail"
+      echo "  $MERGE_WARNINGS"
+    else
+      check "local/config.yaml override has valid keys" "pass"
+    fi
+  else
+    echo "INFO: local/config.yaml found but PyYAML not installed (skipping override validation)"
+  fi
 fi
 
 # Summary

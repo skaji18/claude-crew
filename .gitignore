@@ -22,3 +22,6 @@ memory/
 
 # Claude Code local settings (user-specific overrides)
 .claude/settings.local.json
+
+# Local config overrides (user-specific, not tracked)
+local/

@@ -84,6 +84,27 @@ else
 fi
 
 # =========================================================
+# 2.5. PyYAML  (auto-install if missing, needed for config override merge)
+# =========================================================
+if python3 -c "import yaml" 2>/dev/null; then
+  echo "✓ pyyaml installed"
+else
+  echo "✗ pyyaml not found (needed for local/config.yaml override merge)"
+  if confirm "  Install PyYAML?"; then
+    # Try standard pip first, then --break-system-packages for PEP 668 environments
+    if pip3 install --user pyyaml 2>/dev/null; then
+      echo "  ✓ pyyaml installed successfully"
+    elif pip3 install --user --break-system-packages pyyaml 2>/dev/null; then
+      echo "  ✓ pyyaml installed successfully"
+    else
+      echo "  ⚠ pyyaml installation failed (local config overrides will be ignored)"
+    fi
+  else
+    echo "  Skipped. Config overrides will use base config.yaml only."
+  fi
+fi
+
+# =========================================================
 # 3. git  (check only — too fundamental to auto-install)
 # =========================================================
 if command -v git >/dev/null 2>&1; then
