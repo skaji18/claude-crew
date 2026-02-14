@@ -36,6 +36,12 @@ The parent session directly manages all sub-agents. Sub-agents cannot spawn othe
 - **Single-cycle completion** — A typical request (decompose → execute → aggregate → retrospect) completes within one context window, no compaction needed.
 - **Model flexibility** — Assign `haiku` for simple tasks, `sonnet` for balanced work, `opus` for complex reasoning — per sub-agent.
 
+## Disclaimer
+
+> ⚠️ **This tool is provided "as is" without warranty. No active support is provided. Feel free to use it, but at your own risk.**
+
+This is a personal development tool. While we strive for quality, we make no guarantees about reliability, performance, or fitness for a particular purpose. Use, modify, and distribute at your own discretion — see the MIT license for details.
+
 ## Quick Start
 
 ```bash

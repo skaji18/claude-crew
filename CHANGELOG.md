@@ -6,6 +6,20 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0] - 2026-02-14
+
+### Added
+- **LICENSE file (MIT)** — MIT License with "AS IS" warranty disclaimer for legal compliance and liability protection (cmd_072)
+- **README disclaimer** — Added prominent "as is" disclaimer section before Quick Start; clarifies no active support is provided (cmd_072)
+- **Error code system (E001-E399)** — `scripts/error_codes.sh` with 150 standardized error codes across 4 categories (Configuration E001-E099, Execution E100-E199, Validation E200-E299, System E300-E399); includes 7 helper functions (error, fatal, warn, check_or_error, get_error_message, list_category_errors, list_all_errors) with inline troubleshooting guidance (cmd_072)
+- **Error code integration** — Integrated 30 error codes into 4 existing scripts (new_cmd.sh, validate_result.sh, merge_config.py, validate_config.sh) with standardized `[E###] message → action` format; backward compatible (cmd_072)
+- **config.yaml validation script** — `scripts/validate_config.py` validates required fields, types, ranges, and enums using Python 3 stdlib only (custom YAML parser, no PyYAML dependency); 12 test cases (cmd_072)
+- **execution_log.yaml validation script** — `scripts/validate_exec_log.py` detects 5 anomaly types (invalid status, orphaned tasks, excessive duration, retry violations, duplicate IDs) with severity levels; integrates with config.yaml thresholds (cmd_072)
+- **Roadmap v6** — Restructured roadmap removing public-facing tasks, focusing on self-use quality; 40→25 items, ~40% effort reduction (cmd_072)
+
+### Changed
+- **Version bump** — 1.0-rc2 → 1.0
+
 ## [1.0-rc2] - 2026-02-14
 
 ### Added

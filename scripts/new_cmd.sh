@@ -7,17 +7,29 @@
 set -euo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
+# Source error code system
+source "$(dirname "$0")/error_codes.sh" 2>/dev/null || {
+  echo "ERROR: failed to load error_codes.sh" >&2
+  exit 1
+}
+
 for i in $(seq 1 5); do
   LAST=$(ls work/ 2>/dev/null | sed -n 's/^cmd_\([0-9]*\)$/\1/p' | sort -n | tail -1)
   NEXT=$(printf "%03d" $(( 10#${LAST:-0} + 1 )))
   if mkdir "work/cmd_${NEXT}" 2>/dev/null; then
-    mkdir -p "work/cmd_${NEXT}/tasks" "work/cmd_${NEXT}/results"
+    # Create subdirectories
+    if ! mkdir -p "work/cmd_${NEXT}/tasks" 2>/dev/null; then
+      fatal E063 "work/cmd_${NEXT}/tasks"
+    fi
+    if ! mkdir -p "work/cmd_${NEXT}/results" 2>/dev/null; then
+      fatal E064 "work/cmd_${NEXT}/results"
+    fi
 
     # --- Config merge step ---
     MERGE_EXIT=0
     python3 scripts/merge_config.py "work/cmd_${NEXT}" >/dev/null || MERGE_EXIT=$?
     if [[ $MERGE_EXIT -eq 1 ]]; then
-      echo "ERROR: config merge failed for cmd_${NEXT}" >&2
+      error E024 "cmd_${NEXT}"
       rm -rf "work/cmd_${NEXT}"
       exit 1
     fi
@@ -29,5 +41,4 @@ for i in $(seq 1 5); do
   sleep 0.$((RANDOM % 500))
 done
 
-echo "ERROR: failed to create cmd dir after 5 retries" >&2
-exit 1
+fatal E061

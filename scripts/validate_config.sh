@@ -9,6 +9,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# Source error code system
+source "${SCRIPT_DIR}/error_codes.sh" 2>/dev/null || {
+  echo "ERROR: failed to load error_codes.sh" >&2
+  exit 1
+}
+
 # Determine config path: use work_dir merged config if provided, else base
 if [[ -n "${1:-}" ]] && [[ -f "$1/config.yaml" ]]; then
   CONFIG_PATH="$1/config.yaml"
@@ -35,8 +41,7 @@ echo "=== config.yaml Validation ==="
 
 # Check 0: config.yaml exists
 if [[ ! -f "$CONFIG_PATH" ]]; then
-  echo "FATAL: config.yaml not found at $CONFIG_PATH"
-  exit 1
+  fatal E001 "$CONFIG_PATH"
 fi
 
 # Check 1: version (quoted string, semver-like)
@@ -44,7 +49,8 @@ VERSION=$(grep "^version:" "$CONFIG_PATH" | sed 's/^version:[[:space:]]*//' | tr
 if [[ -n "$VERSION" ]] && [[ "$VERSION" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?(-[a-zA-Z0-9.]+)?$ ]]; then
   check "version is valid: $VERSION" "pass"
 else
-  check "version missing or invalid (expected semver like \"1.0.0\" or \"1.0-rc\", got: $VERSION)" "fail"
+  ERR_MSG=$(get_error_message E011)
+  check "[E011] $ERR_MSG (got: $VERSION)" "fail"
 fi
 
 # Check 2: default_model (haiku, sonnet, or opus)
@@ -52,7 +58,8 @@ DEFAULT_MODEL=$(grep "^default_model:" "$CONFIG_PATH" | awk '{print $2}' | tr -d
 if [[ "$DEFAULT_MODEL" =~ ^(haiku|sonnet|opus)$ ]]; then
   check "default_model is valid: $DEFAULT_MODEL" "pass"
 else
-  check "default_model missing or invalid (expected haiku|sonnet|opus, got: $DEFAULT_MODEL)" "fail"
+  ERR_MSG=$(get_error_message E004)
+  check "[E004] $ERR_MSG (got: $DEFAULT_MODEL)" "fail"
 fi
 
 # Check 3: max_parallel (integer, 1-20)
@@ -60,7 +67,8 @@ MAX_PARALLEL=$(grep "^max_parallel:" "$CONFIG_PATH" | awk '{print $2}' | tr -d '
 if [[ "$MAX_PARALLEL" =~ ^[0-9]+$ ]] && [[ $MAX_PARALLEL -ge 1 ]] && [[ $MAX_PARALLEL -le 20 ]]; then
   check "max_parallel is valid: $MAX_PARALLEL" "pass"
 else
-  check "max_parallel missing or out of range (expected 1-20, got: $MAX_PARALLEL)" "fail"
+  ERR_MSG=$(get_error_message E005)
+  check "[E005] $ERR_MSG (got: $MAX_PARALLEL)" "fail"
 fi
 
 # Check 4: max_retries (integer, 0-10)
@@ -68,7 +76,8 @@ MAX_RETRIES=$(grep "^max_retries:" "$CONFIG_PATH" | awk '{print $2}' | tr -d '[:
 if [[ "$MAX_RETRIES" =~ ^[0-9]+$ ]] && [[ $MAX_RETRIES -ge 0 ]] && [[ $MAX_RETRIES -le 10 ]]; then
   check "max_retries is valid: $MAX_RETRIES" "pass"
 else
-  check "max_retries missing or out of range (expected 0-10, got: $MAX_RETRIES)" "fail"
+  ERR_MSG=$(get_error_message E006)
+  check "[E006] $ERR_MSG (got: $MAX_RETRIES)" "fail"
 fi
 
 # Check 5: background_threshold (integer, 1-20)
@@ -76,7 +85,8 @@ BG_THRESHOLD=$(grep "^background_threshold:" "$CONFIG_PATH" | awk '{print $2}' |
 if [[ "$BG_THRESHOLD" =~ ^[0-9]+$ ]] && [[ $BG_THRESHOLD -ge 1 ]] && [[ $BG_THRESHOLD -le 20 ]]; then
   check "background_threshold is valid: $BG_THRESHOLD" "pass"
 else
-  check "background_threshold missing or out of range (expected 1-20, got: $BG_THRESHOLD)" "fail"
+  ERR_MSG=$(get_error_message E008)
+  check "[E008] $ERR_MSG (got: $BG_THRESHOLD)" "fail"
 fi
 
 # Check 6: worker_max_turns (integer, 5-100)
@@ -84,7 +94,8 @@ WORKER_MAX_TURNS=$(grep "^worker_max_turns:" "$CONFIG_PATH" | awk '{print $2}' |
 if [[ "$WORKER_MAX_TURNS" =~ ^[0-9]+$ ]] && [[ $WORKER_MAX_TURNS -ge 5 ]] && [[ $WORKER_MAX_TURNS -le 100 ]]; then
   check "worker_max_turns is valid: $WORKER_MAX_TURNS" "pass"
 else
-  check "worker_max_turns missing or out of range (expected 5-100, got: $WORKER_MAX_TURNS)" "fail"
+  ERR_MSG=$(get_error_message E007)
+  check "[E007] $ERR_MSG (got: $WORKER_MAX_TURNS)" "fail"
 fi
 
 # Check 7: retrospect.enabled (true or false)
@@ -92,7 +103,8 @@ RETRO_ENABLED=$(grep "^[[:space:]]*enabled:" "$CONFIG_PATH" | head -1 | awk '{pr
 if [[ "$RETRO_ENABLED" =~ ^(true|false)$ ]]; then
   check "retrospect.enabled is valid: $RETRO_ENABLED" "pass"
 else
-  check "retrospect.enabled missing or invalid (expected true|false, got: $RETRO_ENABLED)" "fail"
+  ERR_MSG=$(get_error_message E009)
+  check "[E009] $ERR_MSG (got: $RETRO_ENABLED)" "fail"
 fi
 
 # Check 8: retrospect.filter_threshold (number)
@@ -100,7 +112,8 @@ FILTER_THRESHOLD=$(grep "^[[:space:]]*filter_threshold:" "$CONFIG_PATH" | awk '{
 if [[ "$FILTER_THRESHOLD" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
   check "retrospect.filter_threshold is valid: $FILTER_THRESHOLD" "pass"
 else
-  check "retrospect.filter_threshold missing or invalid (expected number, got: $FILTER_THRESHOLD)" "fail"
+  ERR_MSG=$(get_error_message E012)
+  check "[E012] $ERR_MSG (got: $FILTER_THRESHOLD)" "fail"
 fi
 
 # Check 9: retrospect.model (haiku, sonnet, or opus)
@@ -108,7 +121,8 @@ RETRO_MODEL=$(grep "^[[:space:]]*model:" "$CONFIG_PATH" | head -1 | awk '{print 
 if [[ "$RETRO_MODEL" =~ ^(haiku|sonnet|opus)$ ]]; then
   check "retrospect.model is valid: $RETRO_MODEL" "pass"
 else
-  check "retrospect.model missing or invalid (expected haiku|sonnet|opus, got: $RETRO_MODEL)" "fail"
+  ERR_MSG=$(get_error_message E010)
+  check "[E010] $ERR_MSG (got: $RETRO_MODEL)" "fail"
 fi
 
 # Check 10: max_cmd_duration_sec (optional, integer > 0 if present)
@@ -118,7 +132,8 @@ if [[ -z "$MAX_CMD_DUR" ]]; then
 elif [[ "$MAX_CMD_DUR" =~ ^[0-9]+$ ]] && [[ $MAX_CMD_DUR -gt 0 ]]; then
   check "max_cmd_duration_sec is valid: $MAX_CMD_DUR" "pass"
 else
-  check "max_cmd_duration_sec invalid (expected positive integer, got: $MAX_CMD_DUR)" "fail"
+  ERR_MSG=$(get_error_message E013)
+  check "[E013] $ERR_MSG (got: $MAX_CMD_DUR)" "fail"
 fi
 
 # Check 11: local/config.yaml override validation (if exists and merge script available)

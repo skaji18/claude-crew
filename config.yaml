@@ -1,7 +1,7 @@
 # claude-crew configuration
 
 # Framework version
-version: "1.0-rc2"
+version: "1.0"
 
 # Default model for sub-agents (used when decomposer does not specify)
 default_model: sonnet    # haiku / sonnet / opus

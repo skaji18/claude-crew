@@ -6,6 +6,13 @@
 
 set -euo pipefail
 
+# Source error code system
+SCRIPT_DIR="$(dirname "$0")"
+source "${SCRIPT_DIR}/error_codes.sh" 2>/dev/null || {
+  echo "ERROR: failed to load error_codes.sh" >&2
+  exit 1
+}
+
 # Reconcile mode: check planned vs actual results
 reconcile_plan() {
   local PLAN_PATH="$1"
@@ -83,7 +90,8 @@ ISSUES=()
 
 # Check file exists
 if [[ ! -f "$RESULT_PATH" ]]; then
-  echo '{"complete_marker": false, "line_count": 0, "has_sources": false, "has_code_blocks": false, "status": "fail", "issues": ["file not found"]}'
+  ERR_MSG=$(get_error_message E128)
+  echo "{\"complete_marker\": false, \"line_count\": 0, \"has_sources\": false, \"has_code_blocks\": false, \"status\": \"fail\", \"issues\": [\"[E128] $ERR_MSG\"]}"
   exit 0
 fi
 
@@ -92,14 +100,16 @@ LAST_LINE=$(tail -1 "$RESULT_PATH" 2>/dev/null || echo "")
 if [[ "$LAST_LINE" == "<!-- COMPLETE -->" ]]; then
   COMPLETE_MARKER=true
 else
-  ISSUES+=("complete marker missing")
+  ERR_MSG=$(get_error_message E134)
+  ISSUES+=("[E134] $ERR_MSG")
   STATUS="fail"
 fi
 
 # 2. Check line count
 LINE_COUNT=$(wc -l < "$RESULT_PATH" 2>/dev/null || echo "0")
 if [[ $LINE_COUNT -lt 20 ]]; then
-  ISSUES+=("line count too low: $LINE_COUNT < 20")
+  ERR_MSG=$(get_error_message E135)
+  ISSUES+=("[E135] $ERR_MSG (found: $LINE_COUNT)")
   STATUS="fail"
 fi
 
@@ -109,7 +119,8 @@ if [[ "$PERSONA" == "researcher" ]]; then
   if [[ ${SOURCES_COUNT:-0} -gt 0 ]]; then
     HAS_SOURCES=true
   else
-    ISSUES+=("warning: Sources section missing")
+    ERR_MSG=$(get_error_message E136)
+    ISSUES+=("warning: [E136] $ERR_MSG")
     # Note: warnings do not change status to fail
   fi
 fi
@@ -120,7 +131,8 @@ if [[ "$PERSONA" == "coder" ]]; then
   if [[ ${CODE_BLOCK_COUNT:-0} -gt 0 ]]; then
     HAS_CODE_BLOCKS=true
   else
-    ISSUES+=("warning: code block missing")
+    ERR_MSG=$(get_error_message E137)
+    ISSUES+=("warning: [E137] $ERR_MSG")
     # Note: warnings do not change status to fail
   fi
 fi

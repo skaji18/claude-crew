@@ -190,7 +190,7 @@ def merge_yaml_configs(project_root, work_dir):
 
     # Base config must exist
     if not os.path.exists(base_path):
-        print(f'FATAL: {base_path} not found', file=sys.stderr)
+        print('[E001] config.yaml not found → Run: bash scripts/setup.sh', file=sys.stderr)
         return False, 1
 
     # No local override: copy base verbatim with canary
@@ -207,10 +207,9 @@ def merge_yaml_configs(project_root, work_dir):
     # PyYAML not available but local exists: copy base with warning
     if not HAS_YAML:
         print(
-            'WARNING: PyYAML not installed. local/config.yaml ignored.',
+            '[E023] PyYAML not installed, local config ignored → Install with: pip3 install pyyaml',
             file=sys.stderr,
         )
-        print('Install: pip3 install pyyaml', file=sys.stderr)
         with open(base_path, 'r') as f:
             content = f.read()
         with open(out_path, 'w') as f:
@@ -225,19 +224,19 @@ def merge_yaml_configs(project_root, work_dir):
         with open(base_path, 'r') as f:
             base = yaml.safe_load(f) or {}
     except yaml.YAMLError as e:
-        print(f'FATAL: base config parse error: {e}', file=sys.stderr)
+        print(f'[E002] config.yaml parse error - invalid YAML → Check YAML syntax with a YAML validator or PyYAML (Details: {e})', file=sys.stderr)
         return False, 1
 
     try:
         with open(local_path, 'r') as f:
             local = yaml.safe_load(f) or {}
     except yaml.YAMLError as e:
-        print(f'FATAL: local/config.yaml parse error: {e}', file=sys.stderr)
+        print(f'[E020] local/config.yaml parse error - invalid YAML → Check YAML syntax in local/config.yaml (Details: {e})', file=sys.stderr)
         return False, 1
 
     if not isinstance(local, dict):
         print(
-            f'FATAL: local/config.yaml must be a YAML mapping, got {type(local).__name__}',
+            f'[E022] local/config.yaml must be YAML mapping - not list or scalar → Edit local/config.yaml to use key-value format',
             file=sys.stderr,
         )
         return False, 1
@@ -249,7 +248,7 @@ def merge_yaml_configs(project_root, work_dir):
     has_warnings = False
     key_warnings = validate_keys_recursive(base, local)
     for w in key_warnings:
-        print(f'WARNING: {w}', file=sys.stderr)
+        print(f'[E021] local/config.yaml has unknown keys → Review warnings from merge_config.py for typos or invalid keys ({w})', file=sys.stderr)
         has_warnings = True
 
     # Deep merge
@@ -333,9 +332,7 @@ def merge_permission_configs(base, local):
     for key in FROZEN_KEYS:
         if key in local:
             print(
-                f"WARNING: '{key}' is frozen and cannot be overridden by "
-                f"local config. Ignoring local/hooks/permission-config.yaml "
-                f"'{key}' section.",
+                f"[E028] frozen key override blocked - interpreters cannot be overridden → Remove 'interpreters' key from local/hooks/permission-config.yaml",
                 file=sys.stderr,
             )
 
@@ -412,20 +409,19 @@ def merge_permission_configs_yaml(project_root, work_dir):
         with open(base_path, 'r') as f:
             base = yaml.safe_load(f) or {}
     except yaml.YAMLError as e:
-        print(f'FATAL: base permission-config.yaml parse error: {e}', file=sys.stderr)
+        print(f'[E025] permission-config.yaml parse error → Check YAML syntax in .claude/hooks/permission-config.yaml (Details: {e})', file=sys.stderr)
         return False, 1
 
     try:
         with open(local_path, 'r') as f:
             local = yaml.safe_load(f) or {}
     except yaml.YAMLError as e:
-        print(f'FATAL: local permission-config.yaml parse error: {e}', file=sys.stderr)
+        print(f'[E026] local permission-config.yaml parse error → Check YAML syntax in local/hooks/permission-config.yaml (Details: {e})', file=sys.stderr)
         return False, 1
 
     if not isinstance(local, dict):
         print(
-            f'WARNING: local permission-config.yaml must be a YAML mapping, '
-            f'got {type(local).__name__}. Ignoring overlay.',
+            f'[E027] permission-config.yaml must be YAML mapping → Edit permission-config.yaml to use key-value format',
             file=sys.stderr,
         )
         base['_merged_from'] = 'base'
@@ -475,7 +471,7 @@ def main():
     if not os.path.isdir(work_dir):
         work_dir = os.path.join(project_root, work_dir)
         if not os.path.isdir(work_dir):
-            print(f'FATAL: work directory not found: {work_dir}', file=sys.stderr)
+            print(f'[E060] work directory not found → Work directory should be created automatically, check file system permissions (Path: {work_dir})', file=sys.stderr)
             sys.exit(1)
 
     max_exit = 0
