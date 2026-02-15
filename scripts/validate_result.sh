@@ -137,6 +137,35 @@ if [[ "$PERSONA" == "coder" ]]; then
   fi
 fi
 
+# Extract YAML frontmatter metadata
+RESULT_STATUS="unknown"
+RESULT_QUALITY="unknown"
+RESULT_COMPLETENESS="unknown"
+
+# Read first 20 lines for YAML frontmatter
+FRONTMATTER=$(head -20 "$RESULT_PATH" 2>/dev/null || echo "")
+
+# Extract status field
+if [[ -n "$FRONTMATTER" ]]; then
+  RESULT_STATUS=$(echo "$FRONTMATTER" | grep -E '^status:' | head -1 | awk '{print $2}' || echo "unknown")
+  # If empty, set to unknown
+  [[ -z "$RESULT_STATUS" ]] && RESULT_STATUS="unknown"
+fi
+
+# Extract quality field
+if [[ -n "$FRONTMATTER" ]]; then
+  RESULT_QUALITY=$(echo "$FRONTMATTER" | grep -E '^quality:' | head -1 | awk '{print $2}' || echo "unknown")
+  # If empty, set to unknown
+  [[ -z "$RESULT_QUALITY" ]] && RESULT_QUALITY="unknown"
+fi
+
+# Extract completeness field
+if [[ -n "$FRONTMATTER" ]]; then
+  RESULT_COMPLETENESS=$(echo "$FRONTMATTER" | grep -E '^completeness:' | head -1 | awk '{print $2}' || echo "unknown")
+  # If empty, set to unknown
+  [[ -z "$RESULT_COMPLETENESS" ]] && RESULT_COMPLETENESS="unknown"
+fi
+
 # Build JSON output
 # Escape issues array for JSON
 ISSUES_JSON="["
@@ -161,6 +190,9 @@ cat <<EOF
   "has_sources": $HAS_SOURCES,
   "has_code_blocks": $HAS_CODE_BLOCKS,
   "status": "$STATUS",
-  "issues": $ISSUES_JSON
+  "issues": $ISSUES_JSON,
+  "result_status": "$RESULT_STATUS",
+  "result_quality": "$RESULT_QUALITY",
+  "result_completeness": "$RESULT_COMPLETENESS"
 }
 EOF

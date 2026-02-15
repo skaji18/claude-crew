@@ -55,6 +55,9 @@
    - prompt に TEMPLATE_PATH + 上記3パスを明記する（テンプレートの内容は含めない）
 4. 結果: `work/cmd_xxx/plan.md` にタスク分解結果が書かれる
    - 各サブタスクが `work/cmd_xxx/tasks/task_N.md` として生成される
+   - **Phase A 最適化（W4）**: decomposer は `work/cmd_xxx/wave_plan.json` も生成する
+     - 存在する場合、Phase 2 で wave_plan.json を使用してWave構築効率を向上
+     - 存在しない場合、従来通り plan.md を解析してWaveを構築（後方互換性）
 
 ### Phase 1.5: Plan Validation (Optional, W1)
 
@@ -121,14 +124,31 @@ plan_validation:
 
 **Phase instructions**: If `config.yaml: phase_instructions.execute` is non-empty, append its content to all worker prompts.
 
-1. `work/cmd_xxx/plan.md` のタスク一覧を確認する（親はファイルパスだけ確認）
+1. **phase A 最適化（W4）: wave_plan.json を優先的に読み込む**（Plan.md パース最小化）:
+   - `work/cmd_xxx/wave_plan.json` が存在し有効な JSON か確認する
+   - **存在する場合**:
+     - JSON の `waves` 配列から Wave グループを直接抽出
+     - 各 Wave の `tasks` 配列からタスク ID、persona、model、depends_on を取得
+     - 手順2（従来の依存関係グラフ構築）をスキップし、JSON 構造をそのまま使用
+   - **存在しない/無効な場合**:
+     - フォールバック: `work/cmd_xxx/plan.md` のタスク一覧を従来通り読み込む
+     - 手順2 に進む
+
+   **Wave 構築の詳細（JSON ソース時）**:
+   - JSON スキーマの `waves` 配列の順序が Wave 実行順序となる
+   - 各 Wave 内の `tasks` 配列からタスク情報を抽出して並列実行リストを構築
+
+2. **plan.md ベース Wave 構築（wave_plan.json がない場合のフォールバック）**:
+
+   a. `work/cmd_xxx/plan.md` のタスク一覧を確認する（親はファイルパスだけ確認）
    - 確認する情報: タスク数、各タスクのファイルパス、Depends On列（依存関係）、Persona、Model
    - **タスクの詳細内容（Description等）は読まない**（パス受け渡し係原則）
-2. **依存関係グラフに基づきタスクをグループ化する**:
-   a. `Depends On` が `-`（依存なし）のタスクを **Wave 1** としてグループ化
-   b. Wave 1 のタスクに依存するタスクを **Wave 2** としてグループ化
-   c. 以降、依存元が全て処理済みのタスクを次の Wave にグループ化（全タスク割当まで繰り返し）
-   d. **Wave割り当ては `Depends On` 列のみから計算せよ。plan.md の `## Execution Order` セクションは参照用であり、Wave割り当ての正データではない。** `Execution Order` と `Depends On` 列が矛盾する場合（例: `Depends On: -` のタスクがWave 2以降に配置されている場合）、`Depends On` 列を正とし、そのタスクをWave 1に含める。
+
+   b. **依存関係グラフに基づきタスクをグループ化する**:
+   - `Depends On` が `-`（依存なし）のタスクを **Wave 1** としてグループ化
+   - Wave 1 のタスクに依存するタスクを **Wave 2** としてグループ化
+   - 以降、依存元が全て処理済みのタスクを次の Wave にグループ化（全タスク割当まで繰り返し）
+   - **Wave割り当ては `Depends On` 列のみから計算せよ。plan.md の `## Execution Order` セクションは参照用であり、Wave割り当ての正データではない。** `Execution Order` と `Depends On` 列が矛盾する場合（例: `Depends On: -` のタスクがWave 2以降に配置されている場合）、`Depends On` 列を正とし、そのタスクをWave 1に含める。
 3. **Wave を並列実行する**:
    - **進捗メッセージ**: Wave 実行開始時にユーザーに通知する（ETA付き）
      - 例: `Wave 1/3: 3 tasks running (~2 min est.)`
@@ -166,23 +186,32 @@ plan_validation:
    **エッジケース**:
    - ETA が算出不可（stats データなし、フォールバック不可）: ETA 句を省略、Wave メッセージのみ
 
-4. **Wave 完了確認 → 次の Wave へ進む**:
+3. **Wave 完了確認 → 次の Wave へ進む**:
    a. 現在の Wave の全タスクが完了したら、`results/` 内の result_N.md 存在をチェック
    b. 各resultファイルを `./scripts/validate_result.sh RESULT_PATH PERSONA` で検証する:
       - JSON結果の `status` が `"fail"` → リトライ対象
       - JSON結果の `status` が `"pass"` + `issues` あり → execution_log.yaml の `metadata_issues` に記録
       - JSON結果の `status` が `"pass"` + `issues` なし → 完了
-   c. Read (limit=20) でメタデータヘッダーを読み、status/quality/completeness を確認:
-      - status: "success" → 完了とみなす
-      - status: "partial" または "failure" → リトライ対象
-      - メタデータヘッダーがない場合 → 従来通り存在チェックのみで判定（フォールバック）
-   d. **メタデータバリデーション**: 手順cで読み取ったYAMLフロントマターの必須3項目を検証する:
+
+   c. **Phase A 最適化（W4）: JSON メタデータフィールドで判定（result ファイル読み込み最小化）**:
+      - `validate_result.sh` の JSON 出力に以下の新しいフィールドが含まれている:
+        - `result_status`: result ファイルの YAML frontmatter から抽出された status フィールド
+        - `result_quality`: result ファイルの YAML frontmatter から抽出された quality フィールド
+        - `result_completeness`: result ファイルの YAML frontmatter から抽出された completeness フィールド
+      - **これらのフィールドが存在する場合**、result ファイルの内容を読む必要なく、JSON メタデータのみで判定を完結できる:
+        - `result_status: "success"` → 完了とみなす
+        - `result_status: "partial"` または `result_status: "failure"` → リトライ対象
+      - **フィールドが存在しない場合**（フォールバック）: 従来通り Read (limit=20) でメタデータヘッダーを読み、status/quality/completeness を確認
+
+   d. **メタデータバリデーション**: JSON フィールドまたは手順 c の読み込みで得た YAML frontmatter の必須3項目を検証する:
       - **status**: 欠落時 → `status: failure` として扱う（品質不明のため安全側に倒す）
       - **quality**: 欠落時 → `quality: YELLOW` を付与（品質不明のため）
       - **completeness**: 欠落時 → `completeness: 0` として扱う
       - 検証結果を execution_log.yaml の該当タスクの `metadata_issues` に記録する（例: `quality missing, defaulted to YELLOW`）
       - 3項目全て存在する場合は検証パス。`metadata_issues` は空リスト `[]` のまま
+
    e. 欠落またはstatus=failure/partialの場合は該当タスクをリトライ（最大 `config.yaml: max_retries` 回）
+
    f. **部分結果の転送**: リトライ上限に達したタスクがある場合:
       - 該当タスクの result を `status: failure` として記録する（result ファイルが未生成の場合、親が最小限の failure result を生成する）
       - Phase 3（集約）に進む際、aggregator の prompt に `FAILED_TASKS: [N, M]` を追記する
@@ -194,22 +223,28 @@ plan_validation:
    h. 全resultがstatus=success（またはリトライ上限に達した）ら、次のWaveを並列実行
    i. **依存元が未完了のタスクは絶対に実行しない**
    j. 全 Wave が完了するまで繰り返す
+
+4. **Wave 実行管理**:
    - **Wave 完了時の進捗メッセージ**: 結果サマリをユーザーに通知する
      - 例: `Wave 1/3 完了 (3/3 success)`
+
 5. 結果: `work/cmd_xxx/results/result_N.md` に各タスクの成果が書かれる
    - **全Wave完了時の進捗メッセージ**: 全体サマリをユーザーに通知する
      - 例: `Phase 2 完了: 5/5 タスク success`
+
 6. **タイムアウト処理**: worker が `config.yaml: worker_max_turns` に到達した場合:
    a. execution_log.yaml の該当タスクに `status: timeout` として記録する
    b. 該当タスクをリトライ対象とする（最大 `config.yaml: max_retries` 回）
    c. リトライ上限到達時: result を `status: partial` として記録し、次の Wave へ進む
+
 7. **最終検証**: 全Waveの完了後、以下を実行する:
    a. `work/cmd_xxx/results/` ディレクトリ内のファイル一覧を取得（Glob tool使用）
    b. plan.md のタスク一覧と照合し、以下を確認:
       - 欠落している result_N.md がないか
       - 各resultを `./scripts/validate_result.sh RESULT_PATH PERSONA` で検証し、メタデータヘッダーで status が "success" であるか
-      - 手順4d のメタデータバリデーションを適用し、欠落フィールドにはデフォルト値を付与する
+      - 手順3d のメタデータバリデーションを適用し、欠落フィールドにはデフォルト値を付与する
    c. 欠落がある場合: フェーズ2のリトライフローに従い再実行する。上限到達時は欠落を report.md に記録して次フェーズへ進む
+
 8. **失敗サマリ出力**: Phase 2 完了時に failure/partial タスクが存在する場合、以下の構造化メッセージをユーザーに出力する:
    ```
    ⚠️ Phase 2 completed with failures:
@@ -219,6 +254,7 @@ plan_validation:
    ```
    - failure タスクがある場合でも Phase 3 に進む（aggregator が部分結果を統合する）
    - 50%以上が failure の場合のみフィードバックループを起動する
+
 9. **実行時間チェック**: `config.yaml: max_cmd_duration_sec` が設定されている場合:
    - cmd 開始時刻（execution_log.yaml の `started`）からの経過時間を計算する
    - 閾値を超えた場合、ユーザーに警告を出力する: `⚠️ cmd_NNN has exceeded max duration (${elapsed}s > ${max}s)`

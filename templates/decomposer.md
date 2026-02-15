@@ -130,6 +130,87 @@ cmd_id: "cmd_NNN"                       # command ID (required)
 [Specific instructions, constraints, acceptance criteria]
 ```
 
+### wave_plan.json (W4)
+
+After writing plan.md and all task files, generate an additional structured JSON file (`wave_plan.json`) containing dependency graph metadata. This enables the parent to construct wave execution order from lightweight JSON instead of parsing the full markdown plan.
+
+**File path**: `work/cmd_xxx/wave_plan.json` (sibling to plan.md, same directory)
+
+**Generation timing**: Immediately after writing plan.md and all tasks/task_N.md files
+
+**Schema**:
+
+```json
+{
+  "schema_version": "v1",
+  "total_tasks": <number>,
+  "waves": [
+    {
+      "wave": <number>,
+      "tasks": [
+        {
+          "id": <task_number>,
+          "persona": "<worker_xxx>",
+          "model": "<haiku|sonnet|opus>",
+          "depends_on": [<task_numbers>]
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Requirements**:
+
+1. **schema_version**: Always include `"schema_version": "v1"` for future compatibility and versioning
+2. **total_tasks**: Total count of tasks in the plan (sum across all waves)
+3. **waves**: Array of wave objects, ordered by wave number (1, 2, 3, ...)
+4. **tasks** (per wave): Array of task objects containing:
+   - `id`: Task number (matches task_N.md number)
+   - `persona`: Persona from plan.md Tasks table (e.g., `worker_researcher`, `worker_coder`)
+   - `model`: Model from plan.md Tasks table (e.g., `haiku`, `sonnet`, `opus`)
+   - `depends_on`: Array of task numbers this task depends on. Must match "Depends On" column in plan.md Tasks table exactly (empty array `[]` if no dependencies)
+
+**Example** (for a 2-wave plan with 6 tasks total):
+
+```json
+{
+  "schema_version": "v1",
+  "total_tasks": 6,
+  "waves": [
+    {
+      "wave": 1,
+      "tasks": [
+        {"id": 1, "persona": "worker_researcher", "model": "haiku", "depends_on": []}
+      ]
+    },
+    {
+      "wave": 2,
+      "tasks": [
+        {"id": 2, "persona": "worker_coder", "model": "sonnet", "depends_on": [1]},
+        {"id": 3, "persona": "worker_coder", "model": "sonnet", "depends_on": [1]},
+        {"id": 4, "persona": "worker_writer", "model": "haiku", "depends_on": [2, 3]},
+        {"id": 5, "persona": "worker_reviewer", "model": "haiku", "depends_on": [4]},
+        {"id": 6, "persona": "worker_researcher", "model": "haiku", "depends_on": [1]}
+      ]
+    }
+  ]
+}
+```
+
+**Backward Compatibility**:
+
+If decomposer generates wave_plan.json, parent will prefer JSON over plan.md for wave construction (faster, no parsing needed). However, parent implementation includes a fallback mechanism: if wave_plan.json is missing or malformed, parent will parse plan.md's "## Execution Order" and "## Tasks" sections as before. This ensures compatibility with decomposers that do not yet generate wave_plan.json.
+
+**Decomposer Validation**:
+
+Before writing wave_plan.json, verify:
+- Task count in waves array equals total_tasks field
+- All task IDs in plan.md are represented in wave_plan.json
+- depends_on arrays match "Depends On" column in plan.md exactly
+- No circular dependencies in depends_on references
+- Wave ordering is topologically correct (task dependencies satisfied before task execution)
+
 ## Rules
 
 - **Input validation**: If `REQUEST_PATH` does not exist or is empty, write a failure plan.md (`**Status**: failure`) describing the error. Do not generate task files.
