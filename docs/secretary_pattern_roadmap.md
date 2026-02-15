@@ -37,14 +37,9 @@ status: success
 - 変更箇所: `templates/decomposer.md`（wave_plan.json出力追加）、`docs/parent_guide.md`（Phase 2手順更新）
 - リスク: LOW（スキーマ変更時のバージョン管理が必要）
 
-### A-2: stats.sh 出力のキャッシュ
+### ~~A-2: stats.sh 出力のキャッシュ~~ （ドロップ）
 
-**現状**: ETA計算のために毎cmd `stats.sh` を実行し、出力をコンテキストに取り込む。
-**改善**: 出力を `work/stats_cache.json` にキャッシュ。10cmd以上のログが蓄積するまでフォールバック推定値を使用。
-
-- 節約: 500-1,000トークン/cmd
-- 変更箇所: `scripts/stats.sh`（キャッシュ出力追加）、`docs/parent_guide.md`（ETA計算手順更新）
-- リスク: LOW
+キャッシュが推定値を返すだけでは ETA の意味がなくなるため、実装を見送り。
 
 ### A-3: result メタデータの execution_log 統合
 
@@ -59,11 +54,11 @@ status: success
 
 | 指標 | 値 |
 |------|-----|
-| 合計節約 | 1,300-2,300トークン/cmd（親バジェットの7-10%） |
+| 合計節約 | 800-1,300トークン/cmd（親バジェットの4-7%） |
 | レイテンシ増 | 0秒 |
 | リスク | LOW |
 | 検証期間 | 2-3 cmd |
-| 累計削減率 | 7-10% |
+| 累計削減率 | 4-7% |
 
 ---
 
