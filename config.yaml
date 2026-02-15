@@ -77,6 +77,28 @@ lp_system:
 # Appended to phase prompts when non-empty
 phase_instructions:
   decompose: ""    # Appended to decomposer prompt
-  execute: ""      # Appended to all worker prompts
+  execute: |
+    ## Self-Challenge (Mandatory)
+
+    Before finalizing, apply adversarial review. Adapt depth to task complexity:
+
+    **All tasks (required)**:
+    - List 2 failure scenarios. Format: [scenario] | Likelihood: H/M/L | Impact: Critical/High/Moderate
+
+    **Complex tasks (≥3 design alternatives OR novel problem space)**:
+    - List 3 core assumptions. For EACH: argue why it's FALSE (not "could be" — disprove it).
+    - Propose 1 alternative that contradicts your baseline paradigm (not a variation).
+    - Pre-mortem: If this shipped and failed, what was the root cause?
+    - Evidence check: Flag claims without empirical data or established best practices.
+
+    **Validation (mandatory)**: Your self-challenge MUST contradict ≥1 baseline claim.
+    - BAD: "Assumption X. Why wrong: [argument]. However, design handles it." (sycophantic)
+    - GOOD: "Assumption X is FALSE because [evidence]. Alternative: Y. Trade-off: [comparison]."
+
+    If all findings agree with baseline, RE-CHALLENGE with stronger adversarial stance.
+
+    **Format**: Include "## Self-Challenge" section in your result (structured as above).
+
+    **Exemption**: Trivial tasks (<10 min) may reduce to 1 failure scenario only.
   aggregate: ""    # Appended to aggregator prompt
   retrospect: ""   # Appended to retrospector prompt

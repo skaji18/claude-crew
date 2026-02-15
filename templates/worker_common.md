@@ -87,3 +87,45 @@ Read `docs/lp_rules.md` (LP normative rules, ~40 lines).
 - 失敗した場合は、失敗の経緯・理由を result ファイルに記載せよ（空ファイルやファイル未生成は禁止）。
 - Mask secrets: API keys → `***API_KEY***`, passwords → `***PASSWORD***`
 - **完了マーカー**: ファイル書き込みの最終行に `<!-- COMPLETE -->` を必ず追記せよ。このマーカーが親による書き込み完全性チェックに使われる。
+
+## Self-Challenge Output Format (Layer 0)
+
+`config.yaml: phase_instructions.execute` に Self-Challenge 指示が含まれる場合、結果に以下のセクションを含めよ:
+
+### Failure Scenarios (全タスク必須)
+```
+1. [scenario] | Likelihood: H/M/L | Impact: Critical/High/Moderate
+2. [scenario] | Likelihood: H/M/L | Impact: Critical/High/Moderate
+```
+
+### Assumption Reversal (複雑タスクのみ)
+```
+**Assumption 1**: [statement]
+- **Why it's FALSE**: [evidence-based argument, not hedging]
+- **Implication**: [what changes if assumption is wrong]
+```
+
+### Alternative Paradigm (複雑タスクのみ)
+```
+**Baseline approach**: [summary]
+**Contradictory alternative**: [approach that rejects core baseline assumption]
+**Trade-off comparison**: [baseline pros/cons vs alternative pros/cons]
+```
+
+### Pre-Mortem (複雑タスクのみ)
+```
+**Failure scenario**: This shipped and failed spectacularly.
+**Root cause**: [what fundamental assumption/decision caused the failure]
+```
+
+### Evidence Audit (複雑タスクのみ)
+```
+**Claims lacking empirical evidence**:
+- [claim] — based on [intuition/untested theory/etc]
+```
+
+**ルール**:
+- Trivial タスク (<10 min): Failure Scenarios のみ (2件)
+- Complex タスク: 全サブセクション
+- 全指摘がベースラインに同意する場合: より強い批判姿勢でやり直し
+- バリデーション: 最低1つはベースラインと矛盾する指摘を含むこと
