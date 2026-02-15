@@ -580,6 +580,88 @@ Reduces cross-document inconsistencies from ~15 findings to near-zero by catchin
   └─ 2ステップの場合も同じフローを適用
 ```
 
+## Inline Success Criteria Guidelines
+
+Explicit success criteria help workers understand task completion boundaries and provide clear acceptance conditions. This section instructs decomposers to include success criteria in task files, aligned with EARS notation principles without requiring full SDD overhead.
+
+### Why Success Criteria Matter
+
+- Workers can verify task completion objectively before writing results
+- Eliminates ambiguity about "what done looks like"
+- Reduces back-and-forth clarifications and rework
+- Aligns with acceptance-driven development practices
+
+### Guidelines by Task Type
+
+#### For Simple Coder Tasks
+
+Write **1–2 EARS-format acceptance criteria** in the task's Details section. Focus on the primary deliverable and one constraint.
+
+**Template**:
+```
+Success Criteria:
+- WHEN [action], THEN [specific change] without [breaking change to related functionality]
+```
+
+**Example**:
+```
+Success Criteria:
+- WHEN refactoring utils.js, THEN all exported functions retain identical signatures with no console errors in existing tests
+```
+
+#### For Complex Coder Tasks
+
+Write **2–4 EARS-format acceptance criteria** capturing core functionality, edge cases, performance, and testing requirements.
+
+**Template**:
+```
+Success Criteria:
+1. WHEN [scenario], THEN [requirement]
+2. THEN [constraint or quality gate]
+3. AND all unit tests pass without performance regression
+```
+
+**Example**:
+```
+Success Criteria:
+1. WHEN processing invalid JSON, THEN return structured error with line number and context
+2. THEN parsing time remains <100ms for 10MB files
+3. AND all existing integration tests pass
+4. AND error handling covers all edge cases documented in RFC-12
+```
+
+#### For Research Tasks
+
+Write a **Research Questions** list (bullet points) that the worker must explicitly answer in the final output. Each question should be specific and answerable.
+
+**Template**:
+```
+Research Questions:
+- [Specific question 1]
+- [Specific question 2]
+- [Specific question 3]
+```
+
+**Example**:
+```
+Research Questions:
+- What are the top 3 open-source cost optimization tools for Kubernetes?
+- How do these tools compare in ease of integration with existing monitoring stacks?
+- What are known limitations or vendor lock-in risks for each tool?
+```
+
+### Implementation Instruction
+
+**Include a `## Success Criteria` or `## Research Questions` section in each task_N.md file's Details section.** This becomes the worker's completion checklist and integrates naturally into the task template structure provided in this file.
+
+**Decomposer workflow**:
+1. Draft task Details section with specific requirements
+2. Add either a "Success Criteria" subsection (for coder/writer tasks) or "Research Questions" subsection (for researcher tasks)
+3. Review criteria against task description to ensure alignment
+4. Verify each criterion is objective and testable
+
+**Result for workers**: Workers can run a final validation pass before writing their result file. If all criteria are satisfied, the task is complete.
+
 ## Self-Check（分解完了後に必ず実行）
 
 plan.md と tasks/ を書き終えた後、以下のチェックリストで自己レビューせよ。

@@ -76,3 +76,11 @@ Memory MCP追加候補については `worker_common.md` を参照。
   4. Calculate weighted scores and rank options
   5. Present recommended option with clear justification
 - Scores without rationale are prohibited. Every weight and every score must be justified.
+
+## Research Quality Checklist (Researcher-Specific)
+
+Before submitting your research findings, verify the quality and completeness of your analysis.
+
+- [ ] All research questions answered?
+- [ ] Evidence level (assumed/theoretical/empirical) clearly stated?
+- [ ] Conclusions grounded in evidence, not speculation?

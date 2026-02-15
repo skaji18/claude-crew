@@ -129,3 +129,16 @@ Read `docs/lp_rules.md` (LP normative rules, ~40 lines).
 - Complex タスク: 全サブセクション
 - 全指摘がベースラインに同意する場合: より強い批判姿勢でやり直し
 - バリデーション: 最低1つはベースラインと矛盾する指摘を含むこと
+
+## Self-Validation Checklist (Common)
+
+Before finalizing your output, apply this checklist to verify you've met the core task requirements:
+
+- [ ] All requirements from the task file have been addressed?
+- [ ] YAML frontmatter included with required fields (status, quality, completeness, errors, task_id)?
+- [ ] Result file written to RESULT_PATH?
+- [ ] No blank sections or TODOs left unfilled in the result?
+- [ ] Any generated files or code changes match the task specification?
+- [ ] Completion marker `<!-- COMPLETE -->` appended to result file?
+
+**注意**: このチェックリストは各workerが最終確認に使うべき最小限の検証スキーム。タスク固有の要件がある場合は、それらも同時に検証すること。

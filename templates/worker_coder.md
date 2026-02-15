@@ -73,3 +73,12 @@ Memory MCP追加候補については `worker_common.md` を参照。
 - Write result summary to `RESULT_PATH`. Code changes go to the paths specified in the task.
 - Do not modify files outside the scope defined in the task.
 - If tests fail, document the failure in your result and attempt to fix.
+
+## Implementation Checklist (Coder-Specific)
+
+Before submitting your code changes, verify the following aspects of your implementation:
+
+- [ ] All modified files included in task scope have been changed/covered?
+- [ ] Edge cases and error handling have been considered and implemented?
+- [ ] If test requirements exist in the task, are they satisfied?
+- [ ] Code style and formatting match existing codebase conventions?

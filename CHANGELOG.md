@@ -6,6 +6,11 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Worker self-validation checklists** — Added completion checklists to `worker_common.md` (6-item common checklist), `worker_coder.md` (4-item implementation checklist), `worker_researcher.md` (3-item research quality checklist); lightweight alternative to full SDD, derived from cmd_091 18-task exploration verdict (cmd_098)
+- **Decomposer inline success criteria** — Added `## Inline Success Criteria Guidelines` to `decomposer.md` (+82 lines); instructs decomposers to include EARS-format acceptance criteria for coder tasks and research question lists for researcher tasks; covers simple/complex/research task types with templates and examples (cmd_098)
+- **SDD exploration reference doc** — Created `docs/sdd_exploration.md` documenting cmd_091 findings: R1 design (760-line SDD rejected), R2 validation (verdict C: adopt alternatives), 4 SDD reconsideration conditions, reusable insights (EARS notation, END placement, complexity scoring) (cmd_098)
+
 ### Changed
 - **Permission hook migrated to plugin** — Replaced inline `.claude/hooks/permission-fallback` with `permission-guard` plugin dependency (`skaji18-plugins` marketplace); `.claude/settings.json` now uses `enabledPlugins` instead of `hooks` section; project config moved to `.claude/permission-config.yaml` (Layer 2); deleted 4 inline hook files and test script; updated all references across scripts (setup.sh, health_check.sh, error_codes.sh, merge_config.py) and docs (parent_guide.md, README.md, README_ja.md, roadmap.md) (cmd_093, cmd_095)
 - **Permission hook dual-mode support** — `permission-fallback` now supports both Plugin mode (`$CLAUDE_PLUGIN_ROOT`) and inline mode (`__file__` relative); `_detect_project_dir()` with 3-priority detection chain (`CLAUDE_PROJECT_DIR` → `__file__` → `cwd`); `load_config()` upgraded to 4-layer merge (Hardcoded → Plugin/Inline base → Project `.claude/permission-config.yaml` → Local overlay); all security floors and frozen keys preserved (cmd_092)
