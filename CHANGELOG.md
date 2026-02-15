@@ -7,6 +7,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Changed
+- **Permission hook dual-mode support** — `permission-fallback` now supports both Plugin mode (`$CLAUDE_PLUGIN_ROOT`) and inline mode (`__file__` relative); `_detect_project_dir()` with 3-priority detection chain (`CLAUDE_PROJECT_DIR` → `__file__` → `cwd`); `load_config()` upgraded to 4-layer merge (Hardcoded → Plugin/Inline base → Project `.claude/permission-config.yaml` → Local overlay); all security floors and frozen keys preserved (cmd_092)
 - **Roadmap v6→v7.3 redesign** — Migrated from phase-based (Phase 1-3) to state-based structure (Shipped/Backlog/Conditional); recognized 10 completed items as Shipped; reduced backlog from 25 to 19 items (58.5-63.5h); added Roadmap Maintenance process, Skills Catalog, Breaking Changes sections; effort estimates calibrated via 5-round iterative review with feasibility verification (cmd_090)
 - **Background execution removed** — Deprecated `run_in_background: true` across all docs (`CLAUDE.md`, `parent_guide.md`, `README.md`, `README_ja.md`) and removed `background_threshold` from `config.yaml`; foreground parallel is now the only execution mode; added polling prohibition rule (cmd_089)
 
