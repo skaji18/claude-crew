@@ -21,29 +21,40 @@ The parent provides:
 3. List and read all files in `RESULTS_DIR`
    - **Input validation**: If `PLAN_PATH` is missing/empty or `RESULTS_DIR` contains no result files, write `status: failure` to `REPORT_PATH` with error details, then stop.
 4. Evaluate completeness: were all planned tasks completed?
-5. Synthesize findings into a unified report
-6. **Conflict Detection & Resolution**: After synthesizing all worker results, explicitly check for contradictions:
+5. **Generate Open Questions and Unexplored Dimensions**: Before synthesizing, scan all worker results to identify gaps and unknowns. Use the following 5 heuristics:
+   - **Self-Challenge extraction**: Read each result's `## Self-Challenge` section. Extract unresolved contradictions, unflagged assumptions, and alternative paradigms mentioned but not explored
+   - **Request-result gap analysis**: Compare request.md requirements to result coverage. List topics mentioned in request but absent or only superficially covered in all results
+   - **Unreconciled conflict identification**: From Conflict Detection (Step 6), extract FUNDAMENTAL conflicts with equal evidence. These are open questions by definition
+   - **Assumption flagging**: Scan all results for statements containing "assume", "presume", "given that". If the assumption was flagged but not validated by any worker, add to Open Questions
+   - **Partial result blind spots**: For any failed tasks (Step 3 check), identify what topics they were assigned. These become Unexplored Dimensions with context: "Task N failure left [topic] unaddressed"
+
+   **Critical rule**: Use LLM judgment, not hardcoded filters. Distinguish intentional exclusions (marked out-of-scope in plan.md or request.md) from genuine gaps.
+
+   **Done signal**: If all 5 heuristics yield no findings, write `None` / `(All topics addressed, no gaps detected)` in both sections.
+
+6. Synthesize findings into a unified report
+7. **Conflict Detection & Resolution**: After synthesizing all worker results, explicitly check for contradictions:
    - Scan for: opposing recommendations, conflicting data, incompatible implementations
    - Classify each contradiction as **COSMETIC** (wording difference, same conclusion) or **FUNDAMENTAL** (opposing recommendations)
    - For COSMETIC conflicts: note in synthesis, no quality impact
    - For FUNDAMENTAL conflicts: state which result has stronger evidence and cite it. If evidence is equal, add to report_summary.md YAML frontmatter: `conflicts: ["Worker X vs Worker Y: description"]`
    - Quality impact: any FUNDAMENTAL conflict → minimum quality YELLOW. Unresolvable → YELLOW with resolution recommendation
    - When processing partial results (F08): do NOT flag missing perspectives as conflicts. Note incomplete coverage due to failed tasks instead.
-7. Collect Memory MCP candidates: check each result file for a `## Memory MCP追加候補` section. If found, gather all candidates and include a `## Memory MCP追加候補（統合）` section in the report (grouped by worker). If no candidates exist, write `Memory MCP追加候補: なし`
-8. Aggregate doc_impact: check each result file's YAML frontmatter for the `doc_impact` field. Collect all non-empty entries across all results. If any doc_impact items exist:
+8. Collect Memory MCP candidates: check each result file for a `## Memory MCP追加候補` section. If found, gather all candidates and include a `## Memory MCP追加候補（統合）` section in the report (grouped by worker). If no candidates exist, write `Memory MCP追加候補: なし`
+9. Aggregate doc_impact: check each result file's YAML frontmatter for the `doc_impact` field. Collect all non-empty entries across all results. If any doc_impact items exist:
    - Add a "Doc Impact" subsection within the "Issues & Risks" section of the report
    - List each documented impact as a bullet point
    - If all doc_impact fields are empty, skip this subsection
-9. Quality Review: cross-check all result files for quality issues:
+10. Quality Review: cross-check all result files for quality issues:
    - **Consistency**: Do results contradict each other in numbers, terms, or conclusions?
    - **Evidence**: Are claims backed by sources or verified file references? Flag unverified assertions.
    - **Task compliance**: Does each result_N.md address the requirements in its corresponding task_N.md?
    Assign a Quality Level: GREEN (no issues), YELLOW (MAJOR or below), RED (CRITICAL issues found).
-10. Write the report to `REPORT_PATH`. Include version metadata as fields in the YAML frontmatter:
+11. Write the report to `REPORT_PATH`. Include version metadata as fields in the YAML frontmatter:
    - `generated_by`: `"claude-crew v{version}"` (`{version}` from `config.yaml`)
    - `date`: current date (`YYYY-MM-DD`)
    - `cmd_id`: extracted from the work directory name (e.g., `cmd_001`)
-11. Write the summary to `REPORT_SUMMARY_PATH` (≤50 lines). Format:
+12. Write the summary to `REPORT_SUMMARY_PATH` (≤50 lines). Format:
    ```markdown
    ---
    (same YAML frontmatter as report.md)
@@ -62,7 +73,7 @@ The parent provides:
    ## Memory MCP Candidates
    - 候補数: N件（詳細は report.md を参照）
    ```
-12. Verify both report files exist (use Glob or ls on `REPORT_PATH` and `REPORT_SUMMARY_PATH`). If not found, retry Write
+13. Verify both report files exist (use Glob or ls on `REPORT_PATH` and `REPORT_SUMMARY_PATH`). If not found, retry Write
 
 ## Output Format
 
@@ -117,6 +128,45 @@ conflicts: []            # unresolvable contradictions (F17, optional, empty if 
 
 ## Recommendations
 - [Next steps or follow-up actions]
+
+## Open Questions
+
+Questions or unresolved tensions discovered during synthesis. These describe **what remains unknown**, not what to do about it.
+
+- [Category] Description of the question
+- [Category] Description of the tension or unknown
+
+**Categories**: Assumption, Conflict, Evidence, Trade-off, Boundary, Scope
+
+**Examples**:
+- [Assumption] Whether concurrent cache access requires locking was assumed but not validated
+- [Conflict] Worker 2 claims 50ms latency acceptable, Worker 4 claims <10ms required; no reconciliation basis found
+- [Evidence] Security model assumes TLS 1.3 but no verification of deployment environment TLS version
+- [Trade-off] Read-heavy optimization was chosen but write-heavy scenario impact was not quantified
+- [Boundary] Integration with legacy auth system was marked out-of-scope but dependency impact unclear
+- [Scope] Task 3 mentions distributed tracing but no worker analyzed tracing strategy
+
+If all questions resolved: `None`
+
+## Unexplored Dimensions
+
+Aspects of the problem space that no worker addressed or only partially covered. These describe **coverage gaps**, not recommendations.
+
+- [Category] Description of the unexplored dimension
+- [Category] Description of the partial coverage
+
+**Categories**: Domain, Paradigm, Constraint, Use-case, Integration, Risk, Metric
+
+**Examples**:
+- [Domain] Security analysis focused on authentication but authorization logic was not examined
+- [Paradigm] All proposed solutions assume REST API; event-driven alternatives not considered
+- [Constraint] Performance analysis assumes single-region deployment; multi-region latency not addressed
+- [Use-case] Design covers standard user flow but admin/support workflows not analyzed
+- [Integration] Database schema designed but migration strategy from v1 schema not covered
+- [Risk] Implementation risks analyzed but operational/maintenance risks not addressed
+- [Metric] Latency metrics defined but error rate/retry strategy metrics absent
+
+If all dimensions covered: `(All topics addressed, no gaps detected)`
 
 ## Conflict Detection & Resolution
 

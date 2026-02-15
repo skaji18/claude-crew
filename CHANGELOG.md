@@ -7,6 +7,13 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **`/next-round` skill** (`.claude/skills/next-round/SKILL.md`) — Inter-round navigation: reads completed report.md, detects continuation signals via LLM judgment, presents strategy options (review/mutation/deepen/synthesize + creative freeform), generates next-round request.md with natural Layer 1 keyword embedding; zero scripts, zero config (cmd_101, cmd_103)
+- **Aggregator Open Questions / Unexplored Dimensions** — Two new output sections in `templates/aggregator.md` with category-tagged bullet format (`[Category] Description`); enables signal detection for `/next-round`; gap identification via 5 LLM-based heuristics (cmd_101, cmd_103)
+
+### Removed
+- **`/refine-iteratively` skill** — Deleted `.claude/skills/refine-iteratively/` (7 files, 1,830 lines); replaced by `/next-round` + aggregator enhancement (cmd_101, cmd_103)
+
+### Added
 - **Mutation mechanism plan** — `docs/mutation_plan.md` documenting 4-layer hybrid architecture (Layer 0–2B), implementation roadmap (6 phases, 10-11 weeks), decision framework, known risks, and design references from cmd_079–088 (10-round iterative design)
 - **Worker self-validation checklists** — Added completion checklists to `worker_common.md` (6-item common checklist), `worker_coder.md` (4-item implementation checklist), `worker_researcher.md` (3-item research quality checklist); lightweight alternative to full SDD, derived from cmd_091 18-task exploration verdict (cmd_098)
 - **Decomposer inline success criteria** — Added `## Inline Success Criteria Guidelines` to `decomposer.md` (+82 lines); instructs decomposers to include EARS-format acceptance criteria for coder tasks and research question lists for researcher tasks; covers simple/complex/research task types with templates and examples (cmd_098)
@@ -20,7 +27,6 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Removed
 - **Inline permission hook files** — Removed `.claude/hooks/permission-fallback`, `.claude/hooks/permission-config.yaml`, `.claude/hooks/test-permission-fallback.sh`, `.claude/hooks/test-hooks-support.sh`, `scripts/test_permission_hook.sh` (replaced by `permission-guard` plugin)
-- **`skills/` root directory** — Deleted `skills/refine-iteratively/` (duplicate of `.claude/skills/refine-iteratively/`)
 
 ### Added
 - **Layer 0 Self-Challenge mutation** — Always-on adversarial self-review injected via `phase_instructions.execute`; all workers must list failure scenarios, complex tasks require assumption reversal, alternative paradigm, pre-mortem, and evidence audit; anti-sycophancy validation enforced (cmd_079–088, 10-round mutation design)
@@ -148,11 +154,9 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - **permission-fallback tests expanded** — 95→117件に拡張; null byte, 空コマンド, 長パス, `.claude/hooks/` 境界, init_refine_dir.sh, settings.json削除カバレッジを追加
 - **CLAUDE.md workflow enforcement** — crew ワークフロー必須化（親セッションの Edit/Write 禁止）、Phase 1 必須化、例外条件6件、よくある間違いセクション追加、config.yaml YAML ブロックをクロスリファレンスに置換
 - **parent_guide.md hardening** — Phase 1 を全ケースで必須に変更; パーミッション判定フローチャート追加; `Bash(./scripts/*)` 古い参照を修正; 例外条件を CLAUDE.md と同期
-- **SKILL.md init script** — refine-iteratively に init_refine_dir.sh 参照を追加（permission-fallback.sh 自動承認対応パス）
 
 ### Added
 - **`scripts/health_check.sh`** — 10項目のシステム健全性チェック（config, templates, settings.json, hook実行権限, jq, スクリプト実行権限, hookテスト, CLAUDE.md, parent_guide.md, 古い参照検出）
-- **`.claude/skills/refine-iteratively/scripts/init_refine_dir.sh`** — refine-iteratively 作業ディレクトリの標準化作成スクリプト; `*/scripts/*` パスにより permission-fallback.sh が自動承認
 - **`.claude/hooks/test-hooks-support.sh`** — `.claude/hooks/` サポート専用テストスクリプト
 
 ## [0.8.0] - 2026-02-11
@@ -194,13 +198,6 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ## [0.7.3] - 2026-02-10
 
 ### Added
-- **`/refine-iteratively` Claude Skill** (`.claude/skills/refine-iteratively/`) — user-invocable iterative quality refinement workflow; executes any task through multiple rounds of validation and improvement until acceptance criteria are met
-  - `SKILL.md` — skill definition (invocation, arguments, workflow, validation rules, examples)
-  - `refine_defaults.yaml` — default configuration (thresholds, validation rules, round settings)
-  - `scripts/extract_metadata.py` — YAML frontmatter extraction from result files
-  - `scripts/validate_round.py` — round quality/completeness threshold validation
-  - `scripts/generate_feedback.py` — structured improvement feedback generation
-  - `scripts/consolidate_report.py` — multi-round final report consolidation
 - **Skill scripts permission** in `.claude/settings.json` — added `Bash(./scripts/*)` to allow list for script execution
 
 ## [0.7.2] - 2026-02-08

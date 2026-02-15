@@ -44,8 +44,7 @@ User-invocable skills (commands prefixed with `/`):
 | # | Skill | Command | Purpose | Status | Documentation |
 |---|-------|---------|---------|--------|---------------|
 | S1 | LP Monitor | `/lp-check` | Inspect LP entity count, trigger pruning review | Shipping | `.claude/skills/lp-check/` |
-| S2 | Refine Loop | `/refine-iteratively` | Multi-round design convergence (Rounds 1-N) | Shipping | `.claude/skills/refine-iteratively/` |
-| S3 | Commit Automation | `/commit` | Conventional commits with approval flow | Shipping | `.claude/skills/commit/` |
+| S2 | Commit Automation | `/commit` | Conventional commits with approval flow | Shipping | `.claude/skills/commit/` |
 
 **Completion criteria**: All skills functional with help text and error handling.
 
@@ -289,7 +288,7 @@ Groups within same priority tier can execute in parallel.
 
 2. **Breaking Changes section added**: Documents background execution removal with migration path
 
-3. **Skills Catalog added**: 3 skills documented (lp-check, refine-iteratively, commit)
+3. **Skills Catalog added**: 2 skills documented (lp-check, commit)
 
 4. **Reprioritization based on evidence**:
    - Decomposer optimization (items 11-12): A→B (low utilization)
