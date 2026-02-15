@@ -6,6 +6,9 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **Background execution removed** — Deprecated `run_in_background: true` across all docs (`CLAUDE.md`, `parent_guide.md`, `README.md`, `README_ja.md`) and removed `background_threshold` from `config.yaml`; foreground parallel is now the only execution mode; added polling prohibition rule (cmd_089)
+
 ### Added
 - **Layer 0 Self-Challenge mutation** — Always-on adversarial self-review injected via `phase_instructions.execute`; all workers must list failure scenarios, complex tasks require assumption reversal, alternative paradigm, pre-mortem, and evidence audit; anti-sycophancy validation enforced (cmd_079–088, 10-round mutation design)
 - **doc_impact workflow integration** — LLM-driven documentation impact detection across 3 templates: decomposer Self-Check item (plan-time doc impact awareness), worker_common `doc_impact` output field (worker-reported impacts), aggregator Step 8 (doc_impact aggregation into report); zero-maintenance design with no hardcoded rules or file registries (cmd_078)

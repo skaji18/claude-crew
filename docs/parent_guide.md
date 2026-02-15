@@ -133,7 +133,6 @@ plan_validation:
    - **進捗メッセージ**: Wave 実行開始時にユーザーに通知する（ETA付き）
      - 例: `Wave 1/3: 3 tasks running (~2 min est.)`
      - ETA が算出不可の場合: `Wave 1/3: 3 tasks running`
-     - 背景ワーク時: `Wave 1/3: 3 tasks running (background)`
    - 各タスクに対して実働サブエージェントを起動する:
      - テンプレートパス（TEMPLATE_PATH）: `templates/worker_xxx.md` からタスクに適したものを選択
      - 入力パス: `work/cmd_xxx/tasks/task_N.md`
@@ -166,7 +165,6 @@ plan_validation:
 
    **エッジケース**:
    - ETA が算出不可（stats データなし、フォールバック不可）: ETA 句を省略、Wave メッセージのみ
-   - 全タスクが background ワークの場合: ETA は省略し、代わりに "(background)" を表示
 
 4. **Wave 完了確認 → 次の Wave へ進む**:
    a. 現在の Wave の全タスクが完了したら、`results/` 内の result_N.md 存在をチェック
@@ -911,11 +909,12 @@ TEMPLATE_PATH: templates/xxx.md
 ### 並列実行のルール
 - 独立したタスクは**必ず1メッセージ内で複数の Task tool 呼び出し**を行う
 - 同一ファイルへの並列書き込みは禁止（ファイルパスが重複しないよう設計する）
-- `config.yaml: background_threshold` 並列以上、または長時間タスクの場合は `run_in_background: true` を使用
+- **フォアグラウンド並列のみ使用する**。`run_in_background: true` は使用禁止（background Taskには既知のバグあり: MCP利用不可、output_file 0バイト、通知未発火）
 
-### バックグラウンド実行
-- `run_in_background: true` で起動すると、結果は output_file に書かれる
-- TaskOutput tool で結果を取得する（`block: false` で状態確認可能）
+### ポーリング禁止
+- サブエージェントの output_file を Read/tail で繰り返し確認する行為（ポーリング）は禁止
+- フォアグラウンド Task は完了時に自動的に結果を返すため、ポーリングは不要でありトークンの浪費となる
+- 理由: background 実行を廃止したことにより、ポーリングが必要なケースは存在しない
 
 ## 「パス受け渡し係」原則の許容範囲
 

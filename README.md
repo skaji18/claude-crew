@@ -230,8 +230,7 @@ All scripts follow bash best practices (`set -euo pipefail`) and include usage d
 - **No nesting** — Sub-agents cannot launch other sub-agents. This is a Claude Code platform limitation. The framework works around this with a sequential phase approach (decompose → execute → aggregate → retrospect), where the parent bridges each phase.
 - **Parallel limit: Up to 10** — Claude Code supports up to 10 simultaneous sub-agents. For tasks requiring more parallelism, the framework batches them automatically.
 - **Soft scope restriction** — Worker scope is enforced via prompt instructions, not technical sandboxing. Workers are told which directories to access, but this is an honor system.
-- **Background execution recommended for long tasks** — Use `run_in_background: true` for tasks that take more than a few seconds. The parent can check on them later with `TaskOutput`.
-- **MCP tools unavailable in background** — Sub-agents running in background mode cannot use MCP tools (e.g., external API integrations). Run those tasks in the foreground.
+- **Foreground parallel only** — `run_in_background: true` is not used due to known Claude Code bugs (MCP tools unavailable, output_file 0-byte, notification failures). All tasks run in foreground parallel.
 - **Context independence** — Each sub-agent gets an independent 200k token context window. They don't share memory — all communication goes through files.
 - **Language policy** — `CLAUDE.md` is written in Japanese as it serves as an internal instruction file for Claude agents. `README.md` and other user-facing documentation are in English.
 

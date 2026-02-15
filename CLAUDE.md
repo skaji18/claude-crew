@@ -57,4 +57,4 @@ Full LP rules: `docs/lp_rules.md`
 ## Context Management
 
 Parent is path-passing only. Do not read task/result content.
-Use `run_in_background: true` for long-running subagents.
+Foreground parallel execution only. Do not use `run_in_background: true` (background Task has known bugs: MCP unavailable, output_file 0-byte, notification failures).
