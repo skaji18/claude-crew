@@ -3,7 +3,7 @@
 **Version**: 1.0
 **Date**: 2026-02-15
 **Origin**: cmd_079–088 (10-round iterative design)
-**Status**: Layer 0 deployed, Layer 1–2B conditional
+**Status**: Layer 0 deployed, Layer B/C deployed (cmd_103), Layer 1–2B conditional
 
 ---
 
@@ -74,6 +74,8 @@ Layer 2B: /mutate Skill ─────────── オンデマンド、�
 | "critical challenges" | comprehensive_mutation | 上記3戦略すべてを適用 |
 
 **Layer 0との関係**: 補完的。選択されたタスクはLayer 0（ベースライン自己チェック）とLayer 1（戦略固有の深い突然変異）の両方を受ける。
+
+**自動キーワード配信**: `/next-round`スキルがreport.mdから継続シグナルを検出し、自動生成されたrequest.mdに突然変異キーワード（「前提に疑問を持つ」「欠陥を見つけた」など）を自然な文体で埋め込む。ユーザーが手動でキーワードを追加する代わりに、`/next-round`を呼び出すだけでLayer 1がアクティブになる。
 
 ### Layer 2A: Enhanced Reviewer (Red Pen Protocol)
 
@@ -150,6 +152,13 @@ Layer 2B: /mutate Skill ─────────── オンデマンド、�
 - [x] `config.yaml` — `phase_instructions.execute`編集
 - [x] `templates/worker_common.md` — Self-Challenge Output Format追加
 - [x] commit: `c8d340b`
+
+### Layer B/C Deploy (cmd_101 design, cmd_103 implementation) — DONE
+
+- [x] `templates/aggregator.md` — Open Questions / Unexplored Dimensions sections added
+- [x] `.claude/skills/next-round/SKILL.md` — Inter-round navigation skill created (260 lines, zero-config)
+- [x] `.claude/skills/refine-iteratively/` — Deleted (replaced by /next-round + aggregator enhancement)
+- [x] commit: `80f1dd8`
 
 ### Phase 2: Layer 0 Measurement (Week 2-3) — NEXT
 
