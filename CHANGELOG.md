@@ -7,6 +7,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Mutation mechanism plan** — `docs/mutation_plan.md` documenting 4-layer hybrid architecture (Layer 0–2B), implementation roadmap (6 phases, 10-11 weeks), decision framework, known risks, and design references from cmd_079–088 (10-round iterative design)
 - **Worker self-validation checklists** — Added completion checklists to `worker_common.md` (6-item common checklist), `worker_coder.md` (4-item implementation checklist), `worker_researcher.md` (3-item research quality checklist); lightweight alternative to full SDD, derived from cmd_091 18-task exploration verdict (cmd_098)
 - **Decomposer inline success criteria** — Added `## Inline Success Criteria Guidelines` to `decomposer.md` (+82 lines); instructs decomposers to include EARS-format acceptance criteria for coder tasks and research question lists for researcher tasks; covers simple/complex/research task types with templates and examples (cmd_098)
 - **SDD exploration reference doc** — Created `docs/sdd_exploration.md` documenting cmd_091 findings: R1 design (760-line SDD rejected), R2 validation (verdict C: adopt alternatives), 4 SDD reconsideration conditions, reusable insights (EARS notation, END placement, complexity scoring) (cmd_098)
