@@ -6,6 +6,9 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **parent_guide.md flow control restructure** — Promoted Secretary Delegation pattern from Phase 2 subsection to top-level `### 共通パターン` section; extracted LP operational details (260+ lines) to dedicated `## LP System Operations` section; unified heading levels across Phases; added Secretary to overview.md architecture diagram and CLAUDE.md Template Reference
+
 ### Added
 - **Secretary Pattern v2** — Parent reduced to single-gate router (`secretary.enabled == true` delegates all phases); secretary gains Autonomous Assessment (self-determines skip/execute per operation); 3-value response protocol (success/skip/failure); `config.yaml` simplified from 12→6 lines (removed `delegate_phases`, `min_tasks_for_delegation`); `docs/parent_guide.md` compressed from 3 individual delegation sections (~175 lines) to unified pattern (~58 lines, 67% reduction)
 

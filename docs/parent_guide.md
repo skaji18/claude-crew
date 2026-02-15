@@ -7,6 +7,65 @@
 
 人間からタスクを受けたら、以下の4フェーズで処理する。
 
+### 共通パターン: Secretary Delegation
+
+全Phase（B/C/D）共通の委譲パターン。各Phase冒頭でこのパターンを適用する。
+
+> **v2 移行注記**: v2 では `delegate_phases` および `min_tasks_for_delegation` は使用しない。既存 config にこれらのフィールドが存在しても v2 の親ロジックでは無視される。
+
+```
+IF config.yaml: secretary.enabled == true
+THEN:
+  → Secretary 委譲フロー（以下）を実行
+ELSE:
+  → 各Phaseの従来フロー（Fallback）を実行
+```
+
+#### Secretary 委譲フロー（共通）
+
+1. **Secretary リクエストの作成**:
+   - ファイルパス: `work/cmd_xxx/secretary_request.md`
+   - 内容:
+     ```yaml
+     OPERATION: {phase2_wave_construct | phase3_report | phase4_approval_format}
+     WORK_DIR: work/cmd_xxx/
+     PLAN_PATH: work/cmd_xxx/plan.md
+     WAVE_PLAN_JSON_PATH: work/cmd_xxx/wave_plan.json
+     RESULTS_DIR: work/cmd_xxx/results/
+     REPORT_PATH: work/cmd_xxx/report.md
+     REPORT_SUMMARY_PATH: work/cmd_xxx/report_summary.md
+     RETROSPECTIVE_PATH: work/cmd_xxx/retrospective.md
+     ```
+   - 全パスを記載する。Secretary が OPERATION に応じて必要なパスを選択する。
+
+2. **Secretary サブエージェントの起動**:
+   - テンプレートパス（TEMPLATE_PATH）: `templates/secretary.md`
+   - 入力ファイル: `work/cmd_xxx/secretary_request.md`
+   - 出力ファイル: `work/cmd_xxx/secretary_response.md`
+   - モデル: `config.yaml: secretary.model`（デフォルト: haiku）
+   - max_turns: `config.yaml: secretary.max_turns`（デフォルト: 10）
+   - prompt に TEMPLATE_PATH + 上記パスを明記する（テンプレートの内容は含めない）
+
+3. **Secretary 応答の確認**:
+   - Secretary完了後、`work/cmd_xxx/secretary_response.md` のファイル存在を確認する。ファイルが未生成の場合（secretary がタイムアウト等で応答ファイルを書けなかった場合）、`status: failure` として扱いフォールバックを実行する。
+   - ファイルが存在する場合、先頭10行を Read し、status を確認:
+   - `status: success` → Secretary の出力を使用し、Phase の後続処理へ
+   - `status: skip` → Secretary が委譲不要と判断。従来フロー（Fallback）を実行
+   - `status: failure` → フォールバック処理へ
+
+4. **フォールバック処理**:
+   - IF `config.yaml: secretary.fallback_on_failure == true`:
+     - ログに警告を出力（failure時のみ。skip時は警告不要）
+     - 各Phaseの従来フローを実行
+   - ELSE:
+     - ログにエラーを出力
+     - Phase を中止
+
+5. **Phase固有の成功時処理**:
+   - **phase2_wave_construct**: secretary_response.md から Wave 割り当てを読み、バリデーション層で依存関係を検証（検証失敗→フォールバック）
+   - **phase3_report**: report_summary.md の生成確認、ユーザーへの報告
+   - **phase4_approval_format**: secretary_response.md の本文を読み（≤100行）、整形済み提案を提示
+
 ### コミット準備
 
 フレームワークファイルへの変更を追跡するため、cmd開始時にベースコミットを記録する:
@@ -124,67 +183,8 @@ plan_validation:
 
 **Phase instructions**: If `config.yaml: phase_instructions.execute` is non-empty, append its content to all worker prompts.
 
-#### Secretary Delegation（統一パターン）
-
-全Phase（B/C/D）共通の委譲パターン。各Phase冒頭でこのパターンを適用する。
-
-> **v2 移行注記**: v2 では `delegate_phases` および `min_tasks_for_delegation` は使用しない。既存 config にこれらのフィールドが存在しても v2 の親ロジックでは無視される。
-
-```
-IF config.yaml: secretary.enabled == true
-THEN:
-  → Secretary 委譲フロー（以下）を実行
-ELSE:
-  → 各Phaseの従来フロー（Fallback）を実行
-```
-
-##### Secretary 委譲フロー（共通）
-
-1. **Secretary リクエストの作成**:
-   - ファイルパス: `work/cmd_xxx/secretary_request.md`
-   - 内容:
-     ```yaml
-     OPERATION: {phase2_wave_construct | phase3_report | phase4_approval_format}
-     WORK_DIR: work/cmd_xxx/
-     PLAN_PATH: work/cmd_xxx/plan.md
-     WAVE_PLAN_JSON_PATH: work/cmd_xxx/wave_plan.json
-     RESULTS_DIR: work/cmd_xxx/results/
-     REPORT_PATH: work/cmd_xxx/report.md
-     REPORT_SUMMARY_PATH: work/cmd_xxx/report_summary.md
-     RETROSPECTIVE_PATH: work/cmd_xxx/retrospective.md
-     ```
-   - 全パスを記載する。Secretary が OPERATION に応じて必要なパスを選択する。
-
-2. **Secretary サブエージェントの起動**:
-   - テンプレートパス（TEMPLATE_PATH）: `templates/secretary.md`
-   - 入力ファイル: `work/cmd_xxx/secretary_request.md`
-   - 出力ファイル: `work/cmd_xxx/secretary_response.md`
-   - モデル: `config.yaml: secretary.model`（デフォルト: haiku）
-   - max_turns: `config.yaml: secretary.max_turns`（デフォルト: 10）
-   - prompt に TEMPLATE_PATH + 上記パスを明記する（テンプレートの内容は含めない）
-
-3. **Secretary 応答の確認**:
-   - Secretary完了後、`work/cmd_xxx/secretary_response.md` のファイル存在を確認する。ファイルが未生成の場合（secretary がタイムアウト等で応答ファイルを書けなかった場合）、`status: failure` として扱いフォールバックを実行する。
-   - ファイルが存在する場合、先頭10行を Read し、status を確認:
-   - `status: success` → Secretary の出力を使用し、Phase の後続処理へ
-   - `status: skip` → Secretary が委譲不要と判断。従来フロー（Fallback）を実行
-   - `status: failure` → フォールバック処理へ
-
-4. **フォールバック処理**:
-   - IF `config.yaml: secretary.fallback_on_failure == true`:
-     - ログに警告を出力（failure時のみ。skip時は警告不要）
-     - 各Phaseの従来フローを実行
-   - ELSE:
-     - ログにエラーを出力
-     - Phase を中止
-
-5. **Phase固有の成功時処理**:
-   - **phase2_wave_construct**: secretary_response.md から Wave 割り当てを読み、バリデーション層で依存関係を検証（検証失敗→フォールバック）
-   - **phase3_report**: report_summary.md の生成確認、ユーザーへの報告
-   - **phase4_approval_format**: secretary_response.md の本文を読み（≤100行）、整形済み提案を提示
-
 #### Secretary Delegation
--> 「Secretary Delegation（統一パターン）」を適用（OPERATION: phase2_wave_construct）
+→ 「Secretary Delegation（統一パターン）」を適用（OPERATION: phase2_wave_construct）
 
 #### 従来の Wave 構築フロー（Wave Construction Fallback）
 
@@ -336,7 +336,7 @@ secretary.enabled が false または delegation に失敗した場合（フォ�
 **Phase instructions**: If `config.yaml: phase_instructions.aggregate` is non-empty, append its content to the aggregator prompt.
 
 #### Secretary Delegation
--> 「Secretary Delegation（統一パターン）」を適用（OPERATION: phase3_report）
+→ 「Secretary Delegation（統一パターン）」を適用（OPERATION: phase3_report）
 
 #### 従来の集約フロー（Aggregator）
 
@@ -426,7 +426,7 @@ LP 処理のみ軽量サブエージェントで実行する:
    ```
 
 #### Secretary Delegation
--> 「Secretary Delegation（統一パターン）」を適用（OPERATION: phase4_approval_format）
+→ 「Secretary Delegation（統一パターン）」を適用（OPERATION: phase4_approval_format）
 
 ### Phase 4 完了後: 一括承認フロー（従来フロー）
 
@@ -439,85 +439,9 @@ Phase 4 完了後（または Phase 4 スキップ時は LP Flush 完了後）�
    - LP 候補: retrospective.md の「## Knowledge Candidates」の LP 部分（LP-NNN および LP-UPD-NNN）
    - 重複を除去して優先度順（HIGH/MEDIUM/LOW）に一覧化
 
-ユーザーが一括で承認/却下を判断する。承認された候補のみ処理する:
+ユーザーが一括で承認/却下を判断する。承認された候補のみ処理する。
 
-#### 知識候補の提示順序
-
-**優先度ルール**:
-1. **HIGH 優先**: カウンタ >= 4.0、クロスクラスタ補強、高頻度タスクタイプへの適用
-2. **MEDIUM 優先**: カウンタ 3.0-3.9、既存知識の補強、中頻度タスクタイプへの適用
-3. **LOW 優先**: カウンタギリギリ（3.0）、狭いスコープ、低頻度タスクタイプへの適用
-
-**バッチ制限**:
-- 1回の承認フローで提示する LP 候補は最大3件まで（優先度順にソート）
-- Memory MCP 候補は従来通り全件提示（ただし retrospector が max_candidates_per_cmd で制限済み）
-
-#### 初回LP候補の特別処理（オンボーディング）
-
-初めてLP候補が生成された場合（`lp:_internal:metadata` が存在しないか `total_lp_count: 0` の場合）、候補提示の前に以下の説明を表示する:
-
-```
-### 学習済み好み（Learned Preferences）について
-
-これは、あなたの作業パターンから学習した「好み」を記録する機能です。
-例えば、毎回「TypeScriptで」と指定している場合、次回から自動的にTypeScriptを選ぶようになります。
-
-- **任意機能**: 無効化はいつでも可能です（config.yaml で lp_system.enabled: false）
-- **透明性**: 全ての学習は承認後にのみ記録されます
-- **変更可能**: 後から見直し・削除が可能です
-
-以下、今回学習した候補を提示します。
-```
-
-#### LP候補の提示フォーマット
-
-**重要**: LP候補は技術的なYAMLフォーマットではなく、自然言語で提示する。
-
-**新規LP候補（LP-NNN）**:
-```
-### LP-001: [トピック名]（優先度: HIGH）
-
-**学習内容**:
-「[what] の要約を自然言語で」
-
-**根拠**:
-[evidence を自然言語で。カウンタ値とシグナルタイプの概要]
-例: 「3回の独立したセッションで同様のパターンを観測（修正指示2回、後付け要求1回）」
-
-**適用場面**:
-[scope を自然言語で]
-例: 「コード修正タスク全般」
-
-**AI の行動変化**:
-[action を自然言語で]
-例: 「バグ修正時、テストファイルも自動的に更新します」
-
-**品質チェック**: PASS（正確性・安全性・完全性を損ねません）
-
-承認しますか？ [Y/n/edit]
-```
-
-**LP更新候補（LP-UPD-NNN）**:
-```
-### LP-UPD-001: [トピック名] の更新（優先度: MEDIUM）
-
-**既存の学習内容**:
-[現在のLP観測を自然言語で]
-
-**更新理由**:
-[N 回の矛盾シグナルを検出した旨を説明]
-例: 「最近3回のセッションで異なるパターンが観測されました」
-
-**提案する変更**:
-- [ ] 完全置換（以前の好みから変化した場合）
-- [ ] 条件追加（文脈依存の場合。例: "Pythonプロジェクトでは〜、TypeScriptプロジェクトでは〜"）
-- [ ] 廃止（もはや適用すべきでない場合）
-
-**新しい学習内容**:
-[新しい観測内容を自然言語で]
-
-承認しますか？ [Y/n/keep-existing]
-```
+**LP システムの詳細（提示順序・フォーマット・State Management等）**: 「LP System Operations」セクションを参照。
 
 #### Rejection Memory Storage
 
@@ -586,190 +510,9 @@ When user rejects retrospector proposals:
   1. Memory MCP 候補: `mcp__memory__create_entities` で追加
   2. LP 候補: `mcp__memory__create_entities` で追加（entityType: `learned_preference`）
   3. LP 更新候補: 既存エンティティへの observation 追加または置換
-  4. LP 内部状態の更新（後述の LP System State Management セクション参照）
+  4. LP 内部状態の更新（「LP System Operations」セクション参照）
 
 全ての適用結果を `execution_log.yaml` に記録する。
-
-### LP System State Management
-
-LP承認フロー中に親セッションが実行する内部状態管理操作:
-
-#### Signal Log の更新
-
-承認/却下された LP 候補に対応する signal log エントリを処理する:
-
-1. **承認された LP 候補**:
-   - `lp:_internal:signal_log` から該当トピックのエントリを削除（永続 LP エンティティに昇格したため）
-   - サブエージェントに委譲して `mcp__memory__delete_observations` を実行
-
-2. **却下された LP 候補**:
-   - `lp:_internal:signal_log` から該当トピックのエントリを削除（カウンタリセット）
-   - サブエージェントに委譲して `mcp__memory__delete_observations` を実行
-
-3. **保留（ユーザーが判断を先送り）**:
-   - Signal log をそのまま保持（次回以降のセッションで追加シグナルが蓄積可能）
-
-**内部エンティティ更新の実行方法**:
-```bash
-# haiku サブエージェントに以下の prompt で委譲（max_turns: 5）
-Prompt: |
-  Update LP internal state in Memory MCP.
-
-  Approved LP topics: [list of topics]
-  Rejected LP topics: [list of topics]
-
-  For each approved topic, delete the corresponding observation from lp:_internal:signal_log.
-  For each rejected topic, delete the corresponding observation from lp:_internal:signal_log.
-
-  Use mcp__memory__delete_observations tool.
-```
-
-#### Metadata の更新
-
-承認された LP 候補の数に応じて `lp:_internal:metadata` を更新する:
-
-1. **現在の LP 数を取得**:
-   ```
-   mcp__memory__search_nodes(query="lp:")
-   ```
-   - `lp:_internal:*` を除外してカウント
-
-2. **LP 数上限チェック**:
-   - 現在の LP 数 + 新規承認数 が `config.yaml: lp_system.lp_cap`（デフォルト: 40）を超える場合:
-     - ユーザーに警告: 「LP数が上限に近づいています（現在 X/40）。古いLPの見直しを推奨します。」
-     - 上限到達時: 承認フロー中に stale LP のプルーニングを提案
-
-3. **Metadata エンティティの更新**:
-   - サブエージェントに委譲して `mcp__memory__add_observations` または `mcp__memory__create_entities` を実行
-   - 更新フィールド: `[total_lp_count] X`
-
-**Metadata 更新の実行方法**:
-```bash
-# haiku サブエージェントに以下の prompt で委譲（max_turns: 5）
-Prompt: |
-  Update lp:_internal:metadata entity in Memory MCP.
-
-  Current LP count: {count}
-  LP cap: {cap}
-
-  If lp:_internal:metadata exists, update the [total_lp_count] field.
-  If it does not exist, create it with initial metadata.
-
-  Use mcp__memory__add_observations or mcp__memory__create_entities as appropriate.
-```
-
-#### LP 数上限到達時のプルーニング
-
-LP 数が上限（40）に到達した場合、ユーザーに古い LP の見直しを提案:
-
-1. **Stale LP の抽出**:
-   - 全 LP エンティティの observation から `[meta] Last reinforced: YYYY-MM-DD` を解析
-   - Last reinforced が 60+ 日前、または 20+ セッション前の LP をリストアップ
-
-2. **ユーザーへの提示**:
-   ```
-   LP数が上限に到達しました（40/40）。以下の古いLPの見直しをお勧めします:
-
-   ### Stale LP Candidates (60+ days without reinforcement)
-   - lp:defaults:language_choice: [last reinforced: 2025-12-01]
-   - lp:judgment:readability_vs_performance: [last reinforced: 2025-11-20]
-
-   削除しますか？ [Y/n/review-all]
-   ```
-
-3. **削除承認時**:
-   - サブエージェントに委譲して `mcp__memory__delete_entities` を実行
-   - Metadata の `[total_lp_count]` を更新
-
-### Aggregate Profile Review (Milestone-Based)
-
-When LP count crosses milestones (10, 20, 30), present **aggregate profile review** to user:
-
-**Trigger detection**:
-- After updating metadata, check if total_lp_count is in [10, 20, 30]
-
-**Presentation format**:
-```
-### Aggregate Profile Review: You now have {N} learned preferences
-
-**Purpose**: Review the overall "profile" created by individual LP approvals. Individual approvals ≠ awareness of aggregate pattern.
-
-**Vocabulary (your term definitions)**: {list lp:vocabulary:* entities}
-**Defaults (your repeated choices)**: {list lp:defaults:* entities}
-**Avoidance (what you consistently reject)**: {list lp:avoid:* entities}
-**Judgment patterns (your tradeoff priorities)**: {list lp:judgment:* entities}
-**Communication style (how you prefer to interact)**: {list lp:communication:* entities}
-**Task scope assumptions (what you expect included)**: {list lp:task_scope:* entities}
-
-**Options**:
-- [Keep all] - Continue with current profile
-- [Review individually] - Go through each LP for potential deletion/edit
-- [Clear all] - Delete all LPs and reset system
-
-Choose: [keep/review/clear]
-```
-
-**Implementation**:
-1. Query all LP entities: `mcp__memory__search_nodes(query="lp:")`
-2. Exclude `lp:_internal:*` entities
-3. Group by cluster
-4. Present cluster-by-cluster summary (1-2 line summary per LP)
-5. Handle user choice:
-   - `keep`: Continue, no action
-   - `review`: Iterate through LPs, offer delete/edit/keep per LP
-   - `clear`: Execute reset_all workflow (see Section: Right-to-Forget Workflow)
-
-### Right-to-Forget Workflow (reset_all)
-
-When `config.yaml: lp_system.reset_all: true` is detected OR user requests "delete all LPs":
-
-**Steps**:
-
-1. **Detect trigger**:
-   - Read `config.yaml` at session start
-   - Check `lp_system.reset_all` value
-   - OR user says: "delete all LPs", "reset LP system", "forget everything"
-
-2. **Confirm with user** (if not already explicit):
-   ```
-   You requested deletion of all learned preferences. This will:
-   - Delete all {N} LP entities (lp:vocabulary:*, lp:defaults:*, etc.)
-   - Delete signal accumulation state (pending signals)
-   - Delete LP system metadata
-   - Disable LP system (lp_system.enabled: false)
-
-   This cannot be undone. Proceed? [y/N]
-   ```
-
-3. **Execute deletion** (if confirmed):
-   ```bash
-   # Delegate to haiku subagent (max_turns: 5)
-   Prompt: |
-     Delete all LP system data from Memory MCP.
-
-     Steps:
-     1. Search for all lp:* entities: mcp__memory__search_nodes(query="lp:")
-     2. Delete all LP entities (including lp:_internal:*): mcp__memory__delete_entities
-     3. Confirm deletion count
-
-     Return: Total entities deleted
-   ```
-
-4. **Update config.yaml**:
-   ```yaml
-   lp_system:
-     enabled: false       # Disable system
-     reset_all: false     # Reset flag (one-shot)
-   ```
-
-5. **Confirm to user**:
-   ```
-   Deleted {N} learned preferences
-   Deleted internal state (signal_log, metadata)
-   LP system disabled
-
-   To re-enable: Set lp_system.enabled: true in config.yaml
-   ```
 
 ### コミット履歴の確認
 
@@ -1257,6 +1000,269 @@ Skills提案は以下の5条件を全て満たす場合のみ提案する:
 上記を満たさない成功パターンは、テンプレート改善（IMP-NNN）またはMemory MCP候補として提案する。
 
 **3軸スコアリング閾値**: `config.yaml: retrospect.memory.skill_min_score`（デフォルト: 12点/15点満点）
+
+## LP System Operations
+
+このセクションは LP システムの運用詳細を定義する。メインフロー（Phase 4 完了後の一括承認フロー）から参照される。
+
+### 知識候補の提示順序
+
+**優先度ルール**:
+1. **HIGH 優先**: カウンタ >= 4.0、クロスクラスタ補強、高頻度タスクタイプへの適用
+2. **MEDIUM 優先**: カウンタ 3.0-3.9、既存知識の補強、中頻度タスクタイプへの適用
+3. **LOW 優先**: カウンタギリギリ（3.0）、狭いスコープ、低頻度タスクタイプへの適用
+
+**バッチ制限**:
+- 1回の承認フローで提示する LP 候補は最大3件まで（優先度順にソート）
+- Memory MCP 候補は従来通り全件提示（ただし retrospector が max_candidates_per_cmd で制限済み）
+
+### 初回LP候補の特別処理（オンボーディング）
+
+初めてLP候補が生成された場合（`lp:_internal:metadata` が存在しないか `total_lp_count: 0` の場合）、候補提示の前に以下の説明を表示する:
+
+```
+### 学習済み好み（Learned Preferences）について
+
+これは、あなたの作業パターンから学習した「好み」を記録する機能です。
+例えば、毎回「TypeScriptで」と指定している場合、次回から自動的にTypeScriptを選ぶようになります。
+
+- **任意機能**: 無効化はいつでも可能です（config.yaml で lp_system.enabled: false）
+- **透明性**: 全ての学習は承認後にのみ記録されます
+- **変更可能**: 後から見直し・削除が可能です
+
+以下、今回学習した候補を提示します。
+```
+
+### LP候補の提示フォーマット
+
+**重要**: LP候補は技術的なYAMLフォーマットではなく、自然言語で提示する。
+
+**新規LP候補（LP-NNN）**:
+```
+### LP-001: [トピック名]（優先度: HIGH）
+
+**学習内容**:
+「[what] の要約を自然言語で」
+
+**根拠**:
+[evidence を自然言語で。カウンタ値とシグナルタイプの概要]
+例: 「3回の独立したセッションで同様のパターンを観測（修正指示2回、後付け要求1回）」
+
+**適用場面**:
+[scope を自然言語で]
+例: 「コード修正タスク全般」
+
+**AI の行動変化**:
+[action を自然言語で]
+例: 「バグ修正時、テストファイルも自動的に更新します」
+
+**品質チェック**: PASS（正確性・安全性・完全性を損ねません）
+
+承認しますか？ [Y/n/edit]
+```
+
+**LP更新候補（LP-UPD-NNN）**:
+```
+### LP-UPD-001: [トピック名] の更新（優先度: MEDIUM）
+
+**既存の学習内容**:
+[現在のLP観測を自然言語で]
+
+**更新理由**:
+[N 回の矛盾シグナルを検出した旨を説明]
+例: 「最近3回のセッションで異なるパターンが観測されました」
+
+**提案する変更**:
+- [ ] 完全置換（以前の好みから変化した場合）
+- [ ] 条件追加（文脈依存の場合。例: "Pythonプロジェクトでは〜、TypeScriptプロジェクトでは〜"）
+- [ ] 廃止（もはや適用すべきでない場合）
+
+**新しい学習内容**:
+[新しい観測内容を自然言語で]
+
+承認しますか？ [Y/n/keep-existing]
+```
+
+### LP System State Management
+
+LP承認フロー中に親セッションが実行する内部状態管理操作:
+
+#### Signal Log の更新
+
+承認/却下された LP 候補に対応する signal log エントリを処理する:
+
+1. **承認された LP 候補**:
+   - `lp:_internal:signal_log` から該当トピックのエントリを削除（永続 LP エンティティに昇格したため）
+   - サブエージェントに委譲して `mcp__memory__delete_observations` を実行
+
+2. **却下された LP 候補**:
+   - `lp:_internal:signal_log` から該当トピックのエントリを削除（カウンタリセット）
+   - サブエージェントに委譲して `mcp__memory__delete_observations` を実行
+
+3. **保留（ユーザーが判断を先送り）**:
+   - Signal log をそのまま保持（次回以降のセッションで追加シグナルが蓄積可能）
+
+**内部エンティティ更新の実行方法**:
+```bash
+# haiku サブエージェントに以下の prompt で委譲（max_turns: 5）
+Prompt: |
+  Update LP internal state in Memory MCP.
+
+  Approved LP topics: [list of topics]
+  Rejected LP topics: [list of topics]
+
+  For each approved topic, delete the corresponding observation from lp:_internal:signal_log.
+  For each rejected topic, delete the corresponding observation from lp:_internal:signal_log.
+
+  Use mcp__memory__delete_observations tool.
+```
+
+#### Metadata の更新
+
+承認された LP 候補の数に応じて `lp:_internal:metadata` を更新する:
+
+1. **現在の LP 数を取得**:
+   ```
+   mcp__memory__search_nodes(query="lp:")
+   ```
+   - `lp:_internal:*` を除外してカウント
+
+2. **LP 数上限チェック**:
+   - 現在の LP 数 + 新規承認数 が `config.yaml: lp_system.lp_cap`（デフォルト: 40）を超える場合:
+     - ユーザーに警告: 「LP数が上限に近づいています（現在 X/40）。古いLPの見直しを推奨します。」
+     - 上限到達時: 承認フロー中に stale LP のプルーニングを提案
+
+3. **Metadata エンティティの更新**:
+   - サブエージェントに委譲して `mcp__memory__add_observations` または `mcp__memory__create_entities` を実行
+   - 更新フィールド: `[total_lp_count] X`
+
+**Metadata 更新の実行方法**:
+```bash
+# haiku サブエージェントに以下の prompt で委譲（max_turns: 5）
+Prompt: |
+  Update lp:_internal:metadata entity in Memory MCP.
+
+  Current LP count: {count}
+  LP cap: {cap}
+
+  If lp:_internal:metadata exists, update the [total_lp_count] field.
+  If it does not exist, create it with initial metadata.
+
+  Use mcp__memory__add_observations or mcp__memory__create_entities as appropriate.
+```
+
+#### LP 数上限到達時のプルーニング
+
+LP 数が上限（40）に到達した場合、ユーザーに古い LP の見直しを提案:
+
+1. **Stale LP の抽出**:
+   - 全 LP エンティティの observation から `[meta] Last reinforced: YYYY-MM-DD` を解析
+   - Last reinforced が 60+ 日前、または 20+ セッション前の LP をリストアップ
+
+2. **ユーザーへの提示**:
+   ```
+   LP数が上限に到達しました（40/40）。以下の古いLPの見直しをお勧めします:
+
+   ### Stale LP Candidates (60+ days without reinforcement)
+   - lp:defaults:language_choice: [last reinforced: 2025-12-01]
+   - lp:judgment:readability_vs_performance: [last reinforced: 2025-11-20]
+
+   削除しますか？ [Y/n/review-all]
+   ```
+
+3. **削除承認時**:
+   - サブエージェントに委譲して `mcp__memory__delete_entities` を実行
+   - Metadata の `[total_lp_count]` を更新
+
+### Aggregate Profile Review (Milestone-Based)
+
+When LP count crosses milestones (10, 20, 30), present **aggregate profile review** to user:
+
+**Trigger detection**:
+- After updating metadata, check if total_lp_count is in [10, 20, 30]
+
+**Presentation format**:
+```
+### Aggregate Profile Review: You now have {N} learned preferences
+
+**Purpose**: Review the overall "profile" created by individual LP approvals. Individual approvals ≠ awareness of aggregate pattern.
+
+**Vocabulary (your term definitions)**: {list lp:vocabulary:* entities}
+**Defaults (your repeated choices)**: {list lp:defaults:* entities}
+**Avoidance (what you consistently reject)**: {list lp:avoid:* entities}
+**Judgment patterns (your tradeoff priorities)**: {list lp:judgment:* entities}
+**Communication style (how you prefer to interact)**: {list lp:communication:* entities}
+**Task scope assumptions (what you expect included)**: {list lp:task_scope:* entities}
+
+**Options**:
+- [Keep all] - Continue with current profile
+- [Review individually] - Go through each LP for potential deletion/edit
+- [Clear all] - Delete all LPs and reset system
+
+Choose: [keep/review/clear]
+```
+
+**Implementation**:
+1. Query all LP entities: `mcp__memory__search_nodes(query="lp:")`
+2. Exclude `lp:_internal:*` entities
+3. Group by cluster
+4. Present cluster-by-cluster summary (1-2 line summary per LP)
+5. Handle user choice:
+   - `keep`: Continue, no action
+   - `review`: Iterate through LPs, offer delete/edit/keep per LP
+   - `clear`: Execute reset_all workflow (see Section: Right-to-Forget Workflow)
+
+### Right-to-Forget Workflow (reset_all)
+
+When `config.yaml: lp_system.reset_all: true` is detected OR user requests "delete all LPs":
+
+**Steps**:
+
+1. **Detect trigger**:
+   - Read `config.yaml` at session start
+   - Check `lp_system.reset_all` value
+   - OR user says: "delete all LPs", "reset LP system", "forget everything"
+
+2. **Confirm with user** (if not already explicit):
+   ```
+   You requested deletion of all learned preferences. This will:
+   - Delete all {N} LP entities (lp:vocabulary:*, lp:defaults:*, etc.)
+   - Delete signal accumulation state (pending signals)
+   - Delete LP system metadata
+   - Disable LP system (lp_system.enabled: false)
+
+   This cannot be undone. Proceed? [y/N]
+   ```
+
+3. **Execute deletion** (if confirmed):
+   ```bash
+   # Delegate to haiku subagent (max_turns: 5)
+   Prompt: |
+     Delete all LP system data from Memory MCP.
+
+     Steps:
+     1. Search for all lp:* entities: mcp__memory__search_nodes(query="lp:")
+     2. Delete all LP entities (including lp:_internal:*): mcp__memory__delete_entities
+     3. Confirm deletion count
+
+     Return: Total entities deleted
+   ```
+
+4. **Update config.yaml**:
+   ```yaml
+   lp_system:
+     enabled: false       # Disable system
+     reset_all: false     # Reset flag (one-shot)
+   ```
+
+5. **Confirm to user**:
+   ```
+   Deleted {N} learned preferences
+   Deleted internal state (signal_log, metadata)
+   LP system disabled
+
+   To re-enable: Set lp_system.enabled: true in config.yaml
+   ```
 
 ## ディレクトリ構造
 ```

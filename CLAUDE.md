@@ -36,6 +36,7 @@ Conventional Commits for approved improvements (see `docs/parent_guide.md`).
 | Writer | `templates/worker_writer.md` | Documentation & content |
 | Coder | `templates/worker_coder.md` | Code implementation |
 | Reviewer | `templates/worker_reviewer.md` | Review & quality check |
+| Secretary | `templates/secretary.md` | Phase operation delegation |
 | Custom | `personas/*.md` | User-defined personas |
 | Aggregator | `templates/aggregator.md` | Result integration |
 | Retrospector | `templates/retrospector.md` | Post-mortem analysis |
