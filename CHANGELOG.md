@@ -7,6 +7,9 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Secretary Pattern Phase B/C/D** — `templates/secretary.md` (new) with 3 delegatable operations (phase3_report, phase2_wave_construct, phase4_approval_format); `config.yaml` secretary section with Phase B enabled, C/D staged; `docs/parent_guide.md` updated with secretary delegation judgment, invocation flow, and fallback logic for Phase 2/3/4
+
+### Added
 - **`/next-round` skill** (`.claude/skills/next-round/SKILL.md`) — Inter-round navigation: reads completed report.md, detects continuation signals via LLM judgment, presents strategy options (review/mutation/deepen/synthesize + creative freeform), generates next-round request.md with natural Layer 1 keyword embedding; zero scripts, zero config (cmd_101, cmd_103)
 - **Aggregator Open Questions / Unexplored Dimensions** — Two new output sections in `templates/aggregator.md` with category-tagged bullet format (`[Category] Description`); enables signal detection for `/next-round`; gap identification via 5 LLM-based heuristics (cmd_101, cmd_103)
 

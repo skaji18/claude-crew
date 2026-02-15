@@ -124,6 +124,78 @@ plan_validation:
 
 **Phase instructions**: If `config.yaml: phase_instructions.execute` is non-empty, append its content to all worker prompts.
 
+#### Secretary 委譲判定（Phase C）
+
+Phase 2 開始時に、以下の条件をチェックする:
+
+```
+IF config.yaml: secretary.enabled == true
+   AND "phase2_wave_construct" in config.yaml: secretary.delegate_phases
+   AND task_count >= config.yaml: secretary.min_tasks_for_delegation
+THEN:
+  → Secretary 委譲フロー（以下）を実行
+ELSE:
+  → 従来の Wave 構築フロー（既存フロー）を実行
+```
+
+#### Secretary 委譲フロー（Phase C）
+
+secretary.enabled が true で phase2_wave_construct が delegate_phases に含まれている場合:
+
+1. **Secretary リクエストの作成**:
+   - ファイルパス: `work/cmd_xxx/secretary_request.md`
+   - 内容:
+     ```yaml
+     OPERATION: phase2_wave_construct
+     WORK_DIR: work/cmd_xxx/
+     PLAN_PATH: work/cmd_xxx/plan.md
+     WAVE_PLAN_JSON_PATH: work/cmd_xxx/wave_plan.json
+     ```
+
+2. **Secretary サブエージェントの起動**:
+   - テンプレートパス（TEMPLATE_PATH）: `templates/secretary.md`
+   - 入力ファイル: `work/cmd_xxx/secretary_request.md`
+   - 出力ファイル: `work/cmd_xxx/secretary_response.md`
+   - モデル: `config.yaml: secretary.model`（デフォルト: haiku）
+   - max_turns: `config.yaml: secretary.max_turns`（デフォルト: 10）
+   - prompt に TEMPLATE_PATH + 上記パスを明記する（テンプレートの内容は含めない）
+
+3. **Secretary 応答の確認**:
+   - `work/cmd_xxx/secretary_response.md` の先頭30行を Read で読み、YAMLフロントマターを確認
+   - `validation.status: passed` の場合 → ステップ 4 へ
+   - `validation.status: failed` または `status: failure` の場合 → ステップ 5（フォールバック）へ
+
+4. **Secretary 成功時の処理**:
+   - `work/cmd_xxx/secretary_response.md` から波割り当て YAML を読む（構造:下例参照）
+   - **バリデーション層**: 各 Wave N について、そこに含まれるタスクの `depends_on` リストを確認する:
+     - plan.md または wave_plan.json から各タスクの依存リストを取得
+     - タスク T が Wave N に属する場合、T の `depends_on` リストのタスクがすべて Wave 1〜N-1 に含まれるか確認
+     - 1つでも Wave N 以降に含まれるタスクがあれば **バリデーション失敗** → ステップ 5 へ
+   - バリデーション成功の場合:
+     - Secretary の Wave 割り当てを採用し、以下の構造として保持:
+       ```yaml
+       waves:
+         - wave: 1
+           tasks: [1, 3]
+           depends_on_wave: []
+         - wave: 2
+           tasks: [2, 5]
+           depends_on_wave: [1]
+       ```
+     - ステップ 1（従来の Wave 並列実行）に進む（以降は通常通り）
+
+5. **フォールバック処理**:
+   - IF `config.yaml: secretary.fallback_on_failure == true`:
+     - ログに警告を出力: `⚠️ Secretary failed for Phase 2 wave construction, falling back to direct parsing`
+     - 従来の Wave 構築フロー（以下）を実行
+   - ELSE:
+     - ログにエラーを出力: `❌ Secretary failed for Phase 2 and fallback is disabled`
+     - Phase 2 を中止し、エラーで Phase 3 へ進まない
+
+#### 従来の Wave 構築フロー（Wave Construction Fallback）
+
+secretary.enabled が false または delegation に失敗した場合（フォールバック）、以下の手順で直接 Wave を構築する:
+
 1. **phase A 最適化（W4）: wave_plan.json を優先的に読み込む**（Plan.md パース最小化）:
    - `work/cmd_xxx/wave_plan.json` が存在し有効な JSON か確認する
    - **存在する場合**:
@@ -149,7 +221,8 @@ plan_validation:
    - Wave 1 のタスクに依存するタスクを **Wave 2** としてグループ化
    - 以降、依存元が全て処理済みのタスクを次の Wave にグループ化（全タスク割当まで繰り返し）
    - **Wave割り当ては `Depends On` 列のみから計算せよ。plan.md の `## Execution Order` セクションは参照用であり、Wave割り当ての正データではない。** `Execution Order` と `Depends On` 列が矛盾する場合（例: `Depends On: -` のタスクがWave 2以降に配置されている場合）、`Depends On` 列を正とし、そのタスクをWave 1に含める。
-3. **Wave を並列実行する**:
+
+4. **Wave を並列実行する**:
    - **進捗メッセージ**: Wave 実行開始時にユーザーに通知する（ETA付き）
      - 例: `Wave 1/3: 3 tasks running (~2 min est.)`
      - ETA が算出不可の場合: `Wave 1/3: 3 tasks running`
@@ -186,7 +259,7 @@ plan_validation:
    **エッジケース**:
    - ETA が算出不可（stats データなし、フォールバック不可）: ETA 句を省略、Wave メッセージのみ
 
-3. **Wave 完了確認 → 次の Wave へ進む**:
+5. **Wave 完了確認 → 次の Wave へ進む**:
    a. 現在の Wave の全タスクが完了したら、`results/` 内の result_N.md 存在をチェック
    b. 各resultファイルを `./scripts/validate_result.sh RESULT_PATH PERSONA` で検証する:
       - JSON結果の `status` が `"fail"` → リトライ対象
@@ -224,28 +297,28 @@ plan_validation:
    i. **依存元が未完了のタスクは絶対に実行しない**
    j. 全 Wave が完了するまで繰り返す
 
-4. **Wave 実行管理**:
+6. **Wave 実行管理**:
    - **Wave 完了時の進捗メッセージ**: 結果サマリをユーザーに通知する
      - 例: `Wave 1/3 完了 (3/3 success)`
 
-5. 結果: `work/cmd_xxx/results/result_N.md` に各タスクの成果が書かれる
+7. 結果: `work/cmd_xxx/results/result_N.md` に各タスクの成果が書かれる
    - **全Wave完了時の進捗メッセージ**: 全体サマリをユーザーに通知する
      - 例: `Phase 2 完了: 5/5 タスク success`
 
-6. **タイムアウト処理**: worker が `config.yaml: worker_max_turns` に到達した場合:
+8. **タイムアウト処理**: worker が `config.yaml: worker_max_turns` に到達した場合:
    a. execution_log.yaml の該当タスクに `status: timeout` として記録する
    b. 該当タスクをリトライ対象とする（最大 `config.yaml: max_retries` 回）
    c. リトライ上限到達時: result を `status: partial` として記録し、次の Wave へ進む
 
-7. **最終検証**: 全Waveの完了後、以下を実行する:
+9. **最終検証**: 全Waveの完了後、以下を実行する:
    a. `work/cmd_xxx/results/` ディレクトリ内のファイル一覧を取得（Glob tool使用）
    b. plan.md のタスク一覧と照合し、以下を確認:
       - 欠落している result_N.md がないか
       - 各resultを `./scripts/validate_result.sh RESULT_PATH PERSONA` で検証し、メタデータヘッダーで status が "success" であるか
-      - 手順3d のメタデータバリデーションを適用し、欠落フィールドにはデフォルト値を付与する
+      - 手順4.5d のメタデータバリデーションを適用し、欠落フィールドにはデフォルト値を付与する
    c. 欠落がある場合: フェーズ2のリトライフローに従い再実行する。上限到達時は欠落を report.md に記録して次フェーズへ進む
 
-8. **失敗サマリ出力**: Phase 2 完了時に failure/partial タスクが存在する場合、以下の構造化メッセージをユーザーに出力する:
+10. **失敗サマリ出力**: Phase 2 完了時に failure/partial タスクが存在する場合、以下の構造化メッセージをユーザーに出力する:
    ```
    ⚠️ Phase 2 completed with failures:
    - Task N ({persona}): {status} — {error summary}
@@ -255,7 +328,7 @@ plan_validation:
    - failure タスクがある場合でも Phase 3 に進む（aggregator が部分結果を統合する）
    - 50%以上が failure の場合のみフィードバックループを起動する
 
-9. **実行時間チェック**: `config.yaml: max_cmd_duration_sec` が設定されている場合:
+11. **実行時間チェック**: `config.yaml: max_cmd_duration_sec` が設定されている場合:
    - cmd 開始時刻（execution_log.yaml の `started`）からの経過時間を計算する
    - 閾値を超えた場合、ユーザーに警告を出力する: `⚠️ cmd_NNN has exceeded max duration (${elapsed}s > ${max}s)`
    - 警告のみ。実行を中断しない
@@ -268,6 +341,68 @@ plan_validation:
 
 **Phase instructions**: If `config.yaml: phase_instructions.aggregate` is non-empty, append its content to the aggregator prompt.
 
+#### Secretary Delegation 判定（Phase B）
+
+Phase 3 開始時に、以下の条件をチェックする:
+
+```
+IF config.yaml: secretary.enabled == true
+   AND "phase3_report" in config.yaml: secretary.delegate_phases
+   AND task_count >= config.yaml: secretary.min_tasks_for_delegation
+THEN:
+  → Secretary 委譲フロー（以下）を実行
+ELSE:
+  → 従来の集約フロー（既存フロー）を実行
+```
+
+#### Secretary Delegation フロー（Phase B）
+
+secretary.enabled が true で phase3_report が delegate_phases に含まれている場合:
+
+1. **Secretary リクエストの作成**:
+   - ファイルパス: `work/cmd_xxx/secretary_request.md`
+   - 内容:
+     ```yaml
+     OPERATION: phase3_report
+     RESULTS_DIR: work/cmd_xxx/results/
+     PLAN_PATH: work/cmd_xxx/plan.md
+     REPORT_PATH: work/cmd_xxx/report.md
+     REPORT_SUMMARY_PATH: work/cmd_xxx/report_summary.md
+     ```
+
+2. **Secretary サブエージェントの起動**:
+   - テンプレートパス（TEMPLATE_PATH）: `templates/secretary.md`
+   - 入力ファイル: `work/cmd_xxx/secretary_request.md`
+   - 出力ファイル: `work/cmd_xxx/secretary_response.md`
+   - モデル: `config.yaml: secretary.model`（デフォルト: haiku）
+   - max_turns: `config.yaml: secretary.max_turns`（デフォルト: 10）
+   - prompt に TEMPLATE_PATH + 上記パスを明記する（テンプレートの内容は含めない）
+
+3. **Secretary 応答の確認**:
+   - `work/cmd_xxx/secretary_response.md` の先頭30行を Read で読み、YAMLフロントマターを確認
+   - `status: success` の場合 → ステップ 4 へ
+   - `status: failure` の場合 → ステップ 5（フォールバック）へ
+
+4. **Secretary 成功時の処理**:
+   - `work/cmd_xxx/report_summary.md` が生成されているか確認
+   - 生成されている場合:
+     - 親は `work/cmd_xxx/report_summary.md` を読み、人間に報告する
+     - Memory MCP 候補は `work/cmd_xxx/report.md` に記録されたまま保持する（Phase 4 完了後に一括提示）
+     - Phase 3 完了
+   - 生成されていない場合 → ステップ 5（フォールバック）へ
+
+5. **フォールバック処理**:
+   - IF `config.yaml: secretary.fallback_on_failure == true`:
+     - ログに警告を出力: `⚠️ Secretary failed for Phase 3, falling back to aggregator`
+     - 従来の集約フロー（以下）を実行
+   - ELSE:
+     - ログにエラーを出力: `❌ Secretary failed for Phase 3 and fallback is disabled`
+     - Phase 3 を中止し、エラーで Phase 4 へ進まない
+
+#### 従来の集約フロー（Aggregator）
+
+secretary.enabled が false または delegation に失敗した場合（フォールバック）、以下の手順で直接 aggregator を実行:
+
 1. 集約役サブエージェントを起動する:
    - テンプレートパス（TEMPLATE_PATH）: `templates/aggregator.md`
    - 入力パス（RESULTS_DIR）: `work/cmd_xxx/results/`
@@ -275,8 +410,11 @@ plan_validation:
    - 出力パス（REPORT_PATH）: `work/cmd_xxx/report.md`
    - 要約出力パス（REPORT_SUMMARY_PATH）: `work/cmd_xxx/report_summary.md`
    - prompt に TEMPLATE_PATH + 上記パスを明記する（テンプレートの内容は含めない）
+
 2. 結果: `work/cmd_xxx/report.md`（詳細版）と `work/cmd_xxx/report_summary.md`（要約版、≤50行）に最終報告が書かれる
+
 3. 親は `work/cmd_xxx/report_summary.md` を読み、人間に報告する（詳細版 report.md は原則読まない）
+
 4. Memory MCP 候補は report.md に記録されたまま保持する（Phase 4 完了後に一括提示）
 
 ### フェーズ4: 回顧（Retrospect）
@@ -348,7 +486,62 @@ LP 処理のみ軽量サブエージェントで実行する:
      signal_updates: M
    ```
 
-### Phase 4 完了後: 一括承認フロー
+#### Secretary Delegation 判定（Phase D）
+
+retrospector 完了後（または LP Flush 完了後）、retrospective.md を読む前に以下の条件をチェックする:
+
+```
+IF config.yaml: secretary.enabled == true
+   AND "phase4_approval_format" in config.yaml: secretary.delegate_phases
+THEN:
+  → Secretary 委譲フロー（以下）を実行
+ELSE:
+  → 従来の承認フロー（後述）を実行
+```
+
+#### Secretary Approval Formatting (Phase D)
+
+secretary.enabled が true で phase4_approval_format が delegate_phases に含まれている場合:
+
+1. **Secretary リクエストの作成**:
+   - ファイルパス: `work/cmd_xxx/secretary_request.md`
+   - 内容:
+     ```yaml
+     OPERATION: phase4_approval_format
+     RETROSPECTIVE_PATH: work/cmd_xxx/retrospective.md
+     REPORT_PATH: work/cmd_xxx/report.md
+     MAX_OUTPUT_LINES: 100
+     ```
+
+2. **Secretary サブエージェントの起動**:
+   - テンプレートパス（TEMPLATE_PATH）: `templates/secretary.md`
+   - 入力ファイル: `work/cmd_xxx/secretary_request.md`
+   - 出力ファイル: `work/cmd_xxx/secretary_response.md`
+   - モデル: `config.yaml: secretary.model`（デフォルト: haiku）
+   - max_turns: `config.yaml: secretary.max_turns`（デフォルト: 10）
+   - prompt に TEMPLATE_PATH + 上記パスを明記する（テンプレートの内容は含めない）
+
+3. **Secretary 応答の確認**:
+   - `work/cmd_xxx/secretary_response.md` の先頭30行を Read で読み、YAMLフロントマターを確認
+   - `status: success` の場合 → ステップ 4 へ
+   - `status: failure` の場合 → ステップ 5（フォールバック）へ
+
+4. **Secretary 成功時の処理**:
+   - `work/cmd_xxx/secretary_response.md` の本文（YAMLフロントマター後）を読む（≤100行）
+   - Secretary が生成した整形済み提案テキストをユーザーに提示
+   - 提案にはEvidenceフィールドを**そのまま含める**（要約なし）
+   - 各提案に「詳細は retrospective.md を参照」のリンクを付与
+   - ユーザーが一括で承認/却下を判断（後続ステップは従来の承認フローと同じ）
+
+5. **フォールバック処理**:
+   - IF `config.yaml: secretary.fallback_on_failure == true`:
+     - ログに警告を出力: `⚠️ Secretary failed for Phase 4 approval formatting, reading retrospective.md directly`
+     - 従来の承認フロー（以下）を実行
+   - ELSE:
+     - ログにエラーを出力: `❌ Secretary failed for Phase 4 and fallback is disabled`
+     - Phase 4 を中止し、エラーで人間への報告に進まない
+
+### Phase 4 完了後: 一括承認フロー（従来フロー）
 
 Phase 4 完了後（または Phase 4 スキップ時は LP Flush 完了後）、以下の候補を**一括で**ユーザーに提示する:
 
