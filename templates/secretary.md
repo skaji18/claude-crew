@@ -12,6 +12,46 @@ Parent provides:
 - `OPERATION`: operation type (phase3_report / phase2_wave_construct / phase4_approval_format)
 - Task-specific input files and paths
 
+## Autonomous Assessment
+
+Before executing any operation, assess whether delegation is beneficial:
+
+### Assessment Criteria (Guidelines, not rigid thresholds)
+
+For **phase2_wave_construct**:
+- If task_count <= 2 AND no inter-task dependencies exist: skip is likely appropriate
+- If wave_plan.json already exists and is valid: may still proceed (secretary adds validation value)
+- If task_count >= 3 OR dependencies exist: execute
+
+For **phase3_report**:
+- If only 1 result file exists: skip is likely appropriate (parent can report directly)
+- If 2+ result files exist: execute (aggregation provides value)
+
+For **phase4_approval_format**:
+- Read retrospective.md frontmatter only (first 20 lines)
+- If improvements_accepted == 0 AND skills_accepted == 0: skip (nothing to format)
+- If any proposals exist: execute
+
+### Skip Response
+
+If assessment determines delegation is unnecessary, write secretary_response.md:
+
+```yaml
+---
+status: skip
+operation: {OPERATION}
+reason: "{1-line explanation}"
+output_files: []
+errors: []
+---
+```
+
+Then stop. Do not proceed to operation execution.
+
+### Assessment Failure
+
+If input files required for assessment are missing or unreadable, proceed to execute the operation anyway (fail-open for assessment, fail-closed for execution).
+
 ## Operations
 
 ### Operation: phase3_report (Phase B)
@@ -112,6 +152,10 @@ Parent provides:
 - **Error reporting**: All errors must be logged in secretary_response.md YAML frontmatter
 - **Output verification**: After writing any output file, verify it exists before completion
 - **No modification**: Do not edit input files. Read-only access only.
+- **Three response statuses**: `success` (operation completed), `skip` (delegation unnecessary), `failure` (operation attempted but failed)
+- **Assessment before execution**: Always run Autonomous Assessment before operation workflow. If assessment returns skip, do not proceed to execution.
+- **Context awareness**: Read only frontmatter/metadata of input files for assessment; full content reading only during execution phase.
+- **Respect max_turns**: Respect secretary.max_turns from config; if nearing turn limit, prioritize writing secretary_response.md with current progress over completing all sub-steps.
 
 ## Output Format
 
@@ -119,8 +163,9 @@ All operations write `secretary_response.md` with YAML frontmatter:
 
 ```yaml
 ---
-status: success / failure
+status: success / skip / failure
 operation: [operation name]
+reason: "[explanation if skip or failure, empty if success]"
 output_files:
   - [file paths if success]
 errors: []
@@ -128,13 +173,16 @@ errors: []
 ```
 
 For success: list all generated files with paths.
+For skip: include reason explaining why delegation is unnecessary. No output_files.
 For failure: describe error in YAML + write plaintext explanation below frontmatter.
 
 ## Workflow
 
-1. Read OPERATION parameter
-2. Validate input files exist
-3. Execute operation-specific workflow
-4. Write output files
-5. Generate secretary_response.md with completion metadata
-6. Verify all output files exist
+1. Read OPERATION parameter from secretary_request.md
+2. Validate input files exist (for the specific OPERATION)
+3. **Run Autonomous Assessment**
+   - If skip: write skip response to secretary_response.md, STOP
+4. Execute operation-specific workflow
+5. Write output files
+6. Generate secretary_response.md with completion metadata
+7. Verify all output files exist

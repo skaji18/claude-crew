@@ -124,33 +124,36 @@ plan_validation:
 
 **Phase instructions**: If `config.yaml: phase_instructions.execute` is non-empty, append its content to all worker prompts.
 
-#### Secretary 委譲判定（Phase C）
+#### Secretary Delegation（統一パターン）
 
-Phase 2 開始時に、以下の条件をチェックする:
+全Phase（B/C/D）共通の委譲パターン。各Phase冒頭でこのパターンを適用する。
+
+> **v2 移行注記**: v2 では `delegate_phases` および `min_tasks_for_delegation` は使用しない。既存 config にこれらのフィールドが存在しても v2 の親ロジックでは無視される。
 
 ```
 IF config.yaml: secretary.enabled == true
-   AND "phase2_wave_construct" in config.yaml: secretary.delegate_phases
-   AND task_count >= config.yaml: secretary.min_tasks_for_delegation
 THEN:
   → Secretary 委譲フロー（以下）を実行
 ELSE:
-  → 従来の Wave 構築フロー（既存フロー）を実行
+  → 各Phaseの従来フロー（Fallback）を実行
 ```
 
-#### Secretary 委譲フロー（Phase C）
-
-secretary.enabled が true で phase2_wave_construct が delegate_phases に含まれている場合:
+##### Secretary 委譲フロー（共通）
 
 1. **Secretary リクエストの作成**:
    - ファイルパス: `work/cmd_xxx/secretary_request.md`
    - 内容:
      ```yaml
-     OPERATION: phase2_wave_construct
+     OPERATION: {phase2_wave_construct | phase3_report | phase4_approval_format}
      WORK_DIR: work/cmd_xxx/
      PLAN_PATH: work/cmd_xxx/plan.md
      WAVE_PLAN_JSON_PATH: work/cmd_xxx/wave_plan.json
+     RESULTS_DIR: work/cmd_xxx/results/
+     REPORT_PATH: work/cmd_xxx/report.md
+     REPORT_SUMMARY_PATH: work/cmd_xxx/report_summary.md
+     RETROSPECTIVE_PATH: work/cmd_xxx/retrospective.md
      ```
+   - 全パスを記載する。Secretary が OPERATION に応じて必要なパスを選択する。
 
 2. **Secretary サブエージェントの起動**:
    - テンプレートパス（TEMPLATE_PATH）: `templates/secretary.md`
@@ -161,36 +164,27 @@ secretary.enabled が true で phase2_wave_construct が delegate_phases に含�
    - prompt に TEMPLATE_PATH + 上記パスを明記する（テンプレートの内容は含めない）
 
 3. **Secretary 応答の確認**:
-   - `work/cmd_xxx/secretary_response.md` の先頭30行を Read で読み、YAMLフロントマターを確認
-   - `validation.status: passed` の場合 → ステップ 4 へ
-   - `validation.status: failed` または `status: failure` の場合 → ステップ 5（フォールバック）へ
+   - Secretary完了後、`work/cmd_xxx/secretary_response.md` のファイル存在を確認する。ファイルが未生成の場合（secretary がタイムアウト等で応答ファイルを書けなかった場合）、`status: failure` として扱いフォールバックを実行する。
+   - ファイルが存在する場合、先頭10行を Read し、status を確認:
+   - `status: success` → Secretary の出力を使用し、Phase の後続処理へ
+   - `status: skip` → Secretary が委譲不要と判断。従来フロー（Fallback）を実行
+   - `status: failure` → フォールバック処理へ
 
-4. **Secretary 成功時の処理**:
-   - `work/cmd_xxx/secretary_response.md` から波割り当て YAML を読む（構造:下例参照）
-   - **バリデーション層**: 各 Wave N について、そこに含まれるタスクの `depends_on` リストを確認する:
-     - plan.md または wave_plan.json から各タスクの依存リストを取得
-     - タスク T が Wave N に属する場合、T の `depends_on` リストのタスクがすべて Wave 1〜N-1 に含まれるか確認
-     - 1つでも Wave N 以降に含まれるタスクがあれば **バリデーション失敗** → ステップ 5 へ
-   - バリデーション成功の場合:
-     - Secretary の Wave 割り当てを採用し、以下の構造として保持:
-       ```yaml
-       waves:
-         - wave: 1
-           tasks: [1, 3]
-           depends_on_wave: []
-         - wave: 2
-           tasks: [2, 5]
-           depends_on_wave: [1]
-       ```
-     - ステップ 1（従来の Wave 並列実行）に進む（以降は通常通り）
-
-5. **フォールバック処理**:
+4. **フォールバック処理**:
    - IF `config.yaml: secretary.fallback_on_failure == true`:
-     - ログに警告を出力: `⚠️ Secretary failed for Phase 2 wave construction, falling back to direct parsing`
-     - 従来の Wave 構築フロー（以下）を実行
+     - ログに警告を出力（failure時のみ。skip時は警告不要）
+     - 各Phaseの従来フローを実行
    - ELSE:
-     - ログにエラーを出力: `❌ Secretary failed for Phase 2 and fallback is disabled`
-     - Phase 2 を中止し、エラーで Phase 3 へ進まない
+     - ログにエラーを出力
+     - Phase を中止
+
+5. **Phase固有の成功時処理**:
+   - **phase2_wave_construct**: secretary_response.md から Wave 割り当てを読み、バリデーション層で依存関係を検証（検証失敗→フォールバック）
+   - **phase3_report**: report_summary.md の生成確認、ユーザーへの報告
+   - **phase4_approval_format**: secretary_response.md の本文を読み（≤100行）、整形済み提案を提示
+
+#### Secretary Delegation
+-> 「Secretary Delegation（統一パターン）」を適用（OPERATION: phase2_wave_construct）
 
 #### 従来の Wave 構築フロー（Wave Construction Fallback）
 
@@ -341,63 +335,8 @@ secretary.enabled が false または delegation に失敗した場合（フォ�
 
 **Phase instructions**: If `config.yaml: phase_instructions.aggregate` is non-empty, append its content to the aggregator prompt.
 
-#### Secretary Delegation 判定（Phase B）
-
-Phase 3 開始時に、以下の条件をチェックする:
-
-```
-IF config.yaml: secretary.enabled == true
-   AND "phase3_report" in config.yaml: secretary.delegate_phases
-   AND task_count >= config.yaml: secretary.min_tasks_for_delegation
-THEN:
-  → Secretary 委譲フロー（以下）を実行
-ELSE:
-  → 従来の集約フロー（既存フロー）を実行
-```
-
-#### Secretary Delegation フロー（Phase B）
-
-secretary.enabled が true で phase3_report が delegate_phases に含まれている場合:
-
-1. **Secretary リクエストの作成**:
-   - ファイルパス: `work/cmd_xxx/secretary_request.md`
-   - 内容:
-     ```yaml
-     OPERATION: phase3_report
-     RESULTS_DIR: work/cmd_xxx/results/
-     PLAN_PATH: work/cmd_xxx/plan.md
-     REPORT_PATH: work/cmd_xxx/report.md
-     REPORT_SUMMARY_PATH: work/cmd_xxx/report_summary.md
-     ```
-
-2. **Secretary サブエージェントの起動**:
-   - テンプレートパス（TEMPLATE_PATH）: `templates/secretary.md`
-   - 入力ファイル: `work/cmd_xxx/secretary_request.md`
-   - 出力ファイル: `work/cmd_xxx/secretary_response.md`
-   - モデル: `config.yaml: secretary.model`（デフォルト: haiku）
-   - max_turns: `config.yaml: secretary.max_turns`（デフォルト: 10）
-   - prompt に TEMPLATE_PATH + 上記パスを明記する（テンプレートの内容は含めない）
-
-3. **Secretary 応答の確認**:
-   - `work/cmd_xxx/secretary_response.md` の先頭30行を Read で読み、YAMLフロントマターを確認
-   - `status: success` の場合 → ステップ 4 へ
-   - `status: failure` の場合 → ステップ 5（フォールバック）へ
-
-4. **Secretary 成功時の処理**:
-   - `work/cmd_xxx/report_summary.md` が生成されているか確認
-   - 生成されている場合:
-     - 親は `work/cmd_xxx/report_summary.md` を読み、人間に報告する
-     - Memory MCP 候補は `work/cmd_xxx/report.md` に記録されたまま保持する（Phase 4 完了後に一括提示）
-     - Phase 3 完了
-   - 生成されていない場合 → ステップ 5（フォールバック）へ
-
-5. **フォールバック処理**:
-   - IF `config.yaml: secretary.fallback_on_failure == true`:
-     - ログに警告を出力: `⚠️ Secretary failed for Phase 3, falling back to aggregator`
-     - 従来の集約フロー（以下）を実行
-   - ELSE:
-     - ログにエラーを出力: `❌ Secretary failed for Phase 3 and fallback is disabled`
-     - Phase 3 を中止し、エラーで Phase 4 へ進まない
+#### Secretary Delegation
+-> 「Secretary Delegation（統一パターン）」を適用（OPERATION: phase3_report）
 
 #### 従来の集約フロー（Aggregator）
 
@@ -486,60 +425,8 @@ LP 処理のみ軽量サブエージェントで実行する:
      signal_updates: M
    ```
 
-#### Secretary Delegation 判定（Phase D）
-
-retrospector 完了後（または LP Flush 完了後）、retrospective.md を読む前に以下の条件をチェックする:
-
-```
-IF config.yaml: secretary.enabled == true
-   AND "phase4_approval_format" in config.yaml: secretary.delegate_phases
-THEN:
-  → Secretary 委譲フロー（以下）を実行
-ELSE:
-  → 従来の承認フロー（後述）を実行
-```
-
-#### Secretary Approval Formatting (Phase D)
-
-secretary.enabled が true で phase4_approval_format が delegate_phases に含まれている場合:
-
-1. **Secretary リクエストの作成**:
-   - ファイルパス: `work/cmd_xxx/secretary_request.md`
-   - 内容:
-     ```yaml
-     OPERATION: phase4_approval_format
-     RETROSPECTIVE_PATH: work/cmd_xxx/retrospective.md
-     REPORT_PATH: work/cmd_xxx/report.md
-     MAX_OUTPUT_LINES: 100
-     ```
-
-2. **Secretary サブエージェントの起動**:
-   - テンプレートパス（TEMPLATE_PATH）: `templates/secretary.md`
-   - 入力ファイル: `work/cmd_xxx/secretary_request.md`
-   - 出力ファイル: `work/cmd_xxx/secretary_response.md`
-   - モデル: `config.yaml: secretary.model`（デフォルト: haiku）
-   - max_turns: `config.yaml: secretary.max_turns`（デフォルト: 10）
-   - prompt に TEMPLATE_PATH + 上記パスを明記する（テンプレートの内容は含めない）
-
-3. **Secretary 応答の確認**:
-   - `work/cmd_xxx/secretary_response.md` の先頭30行を Read で読み、YAMLフロントマターを確認
-   - `status: success` の場合 → ステップ 4 へ
-   - `status: failure` の場合 → ステップ 5（フォールバック）へ
-
-4. **Secretary 成功時の処理**:
-   - `work/cmd_xxx/secretary_response.md` の本文（YAMLフロントマター後）を読む（≤100行）
-   - Secretary が生成した整形済み提案テキストをユーザーに提示
-   - 提案にはEvidenceフィールドを**そのまま含める**（要約なし）
-   - 各提案に「詳細は retrospective.md を参照」のリンクを付与
-   - ユーザーが一括で承認/却下を判断（後続ステップは従来の承認フローと同じ）
-
-5. **フォールバック処理**:
-   - IF `config.yaml: secretary.fallback_on_failure == true`:
-     - ログに警告を出力: `⚠️ Secretary failed for Phase 4 approval formatting, reading retrospective.md directly`
-     - 従来の承認フロー（以下）を実行
-   - ELSE:
-     - ログにエラーを出力: `❌ Secretary failed for Phase 4 and fallback is disabled`
-     - Phase 4 を中止し、エラーで人間への報告に進まない
+#### Secretary Delegation
+-> 「Secretary Delegation（統一パターン）」を適用（OPERATION: phase4_approval_format）
 
 ### Phase 4 完了後: 一括承認フロー（従来フロー）
 

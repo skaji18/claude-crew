@@ -7,7 +7,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- **Secretary Pattern Phase B/C/D** — `templates/secretary.md` (new) with 3 delegatable operations (phase3_report, phase2_wave_construct, phase4_approval_format); `config.yaml` secretary section with Phase B enabled, C/D staged; `docs/parent_guide.md` updated with secretary delegation judgment, invocation flow, and fallback logic for Phase 2/3/4
+- **Secretary Pattern v2** — Parent reduced to single-gate router (`secretary.enabled == true` delegates all phases); secretary gains Autonomous Assessment (self-determines skip/execute per operation); 3-value response protocol (success/skip/failure); `config.yaml` simplified from 12→6 lines (removed `delegate_phases`, `min_tasks_for_delegation`); `docs/parent_guide.md` compressed from 3 individual delegation sections (~175 lines) to unified pattern (~58 lines, 67% reduction)
 
 ### Added
 - **`/next-round` skill** (`.claude/skills/next-round/SKILL.md`) — Inter-round navigation: reads completed report.md, detects continuation signals via LLM judgment, presents strategy options (review/mutation/deepen/synthesize + creative freeform), generates next-round request.md with natural Layer 1 keyword embedding; zero scripts, zero config (cmd_101, cmd_103)

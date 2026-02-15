@@ -70,18 +70,16 @@ lp_system:
                                  # Examples: ["TypeScript", "React", "Node.js"]
                                  # Used for auto-inferring LP scope
 
-# Secretary Pattern (Phase B/C/D delegation)
-# Reduces parent context consumption by delegating Phase operations to haiku sub-agent
+# Secretary Pattern — delegates Phase operations to haiku sub-agent
+# When enabled, ALL Phase operations (B/C/D) are delegated. Secretary autonomously
+# decides whether to execute or skip each operation based on context.
+# Migration note: v1 fields (delegate_phases, min_tasks_for_delegation) are no longer used.
+# If present in local/config.yaml, they will be silently ignored by v2 parent logic.
 secretary:
-  enabled: true
-  min_tasks_for_delegation: 4    # Skip delegation for cmds with <4 tasks
-  delegate_phases:
-    - phase3_report              # Phase B: report.md + report_summary.md generation
-    # - phase2_wave_construct    # Phase C: Wave allocation (enable after 10+ successful Phase B cmds)
-    # - phase4_approval_format   # Phase D: Approval flow formatting (enable after 20+ successful Phase C cmds)
+  enabled: true                    # true = delegate all phases; false = traditional flow
   model: haiku
   max_turns: 10
-  fallback_on_failure: true      # If secretary fails, parent falls back to direct execution
+  fallback_on_failure: true        # If secretary fails or skips, parent falls back to direct execution
 
 # Phase-specific custom instructions (optional)
 # Appended to phase prompts when non-empty
