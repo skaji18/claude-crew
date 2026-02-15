@@ -30,7 +30,7 @@ declare -A ERROR_MESSAGES=(
   ["E022"]="local/config.yaml must be YAML mapping - not list or scalar → Edit local/config.yaml to use key-value format"
   ["E023"]="PyYAML not installed, local config ignored → Install with: pip3 install pyyaml"
   ["E024"]="config merge failed → Check stderr output from merge_config.py for details"
-  ["E025"]="permission-config.yaml parse error → Check YAML syntax in .claude/hooks/permission-config.yaml"
+  ["E025"]="permission-config.yaml parse error → Check YAML syntax in .claude/permission-config.yaml"
   ["E026"]="local permission-config.yaml parse error → Check YAML syntax in local/hooks/permission-config.yaml"
   ["E027"]="permission-config.yaml must be YAML mapping → Edit permission-config.yaml to use key-value format"
   ["E028"]="frozen key override blocked - interpreters cannot be overridden → Remove 'interpreters' key from local/hooks/permission-config.yaml"
@@ -54,8 +54,8 @@ declare -A ERROR_MESSAGES=(
   # Settings errors (E080-E099)
   ["E080"]="settings.json not found → Run: bash scripts/setup.sh or restore .claude/settings.json from git"
   ["E081"]="settings.json invalid JSON → Check JSON syntax with: jq . .claude/settings.json"
-  ["E082"]="permission-fallback hook not executable → Run: chmod +x .claude/hooks/permission-fallback"
-  ["E083"]="permission-fallback hook not found → Run: bash scripts/setup.sh or restore from git"
+  ["E082"]="permission-guard plugin not enabled → Run: /plugin install permission-guard@skaji18-plugins"
+  ["E083"]="permission-guard plugin not installed → Run: /plugin install permission-guard@skaji18-plugins"
 )
 
 declare -A CONFIG_ERRORS=(

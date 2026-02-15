@@ -18,7 +18,8 @@ See `docs/parent_guide.md` for full rules, exception list, and role restrictions
 `config.yaml` required. Stop on missing.
 Parent reads `work/cmd_NNN/config.yaml` (merged by `new_cmd.sh`).
 If `local/config.yaml` exists, it is deep-merged into the work copy at cmd start.
-Permission hook reads `local/hooks/permission-config.yaml` directly at runtime.
+Permission hook provided by `permission-guard` plugin (`/plugin install permission-guard@skaji18-plugins`).
+Project config: `.claude/permission-config.yaml`. Local overlay: `local/hooks/permission-config.yaml`.
 
 ## Version
 

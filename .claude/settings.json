@@ -20,16 +20,15 @@
       "Bash(*DROP TABLE*)", "Bash(*DROP DATABASE*)"
     ]
   },
-  "hooks": {
-    "PermissionRequest": [
-      {
-        "matcher": "Bash",
-        "hooks": [{
-          "type": "command",
-          "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/permission-fallback",
-          "timeout": 5
-        }]
+  "extraKnownMarketplaces": {
+    "skaji18-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "skaji18/claude-plugins"
       }
-    ]
+    }
+  },
+  "enabledPlugins": {
+    "permission-guard@skaji18-plugins": true
   }
 }

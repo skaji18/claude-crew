@@ -364,14 +364,14 @@ def merge_permission_configs(base, local):
 
 def merge_permission_configs_yaml(project_root, work_dir):
     """
-    Merge permission-config.yaml + local/hooks/permission-config.yaml
+    Merge .claude/permission-config.yaml + local/hooks/permission-config.yaml
     -> work_dir/permission-config.yaml (reference snapshot).
 
-    Note: The hook reads from local/hooks/ directly at runtime.
+    Note: The permission-guard plugin reads config at runtime.
     This snapshot is for reproducibility/debugging only.
     """
     base_path = os.path.join(
-        project_root, '.claude', 'hooks', 'permission-config.yaml'
+        project_root, '.claude', 'permission-config.yaml'
     )
     local_path = os.path.join(
         project_root, 'local', 'hooks', 'permission-config.yaml'
@@ -409,7 +409,7 @@ def merge_permission_configs_yaml(project_root, work_dir):
         with open(base_path, 'r') as f:
             base = yaml.safe_load(f) or {}
     except yaml.YAMLError as e:
-        print(f'[E025] permission-config.yaml parse error → Check YAML syntax in .claude/hooks/permission-config.yaml (Details: {e})', file=sys.stderr)
+        print(f'[E025] permission-config.yaml parse error → Check YAML syntax in .claude/permission-config.yaml (Details: {e})', file=sys.stderr)
         return False, 1
 
     try:

@@ -962,12 +962,12 @@ claude-crew uses a 3-layer permission control system to balance safety with usab
 - Examples: `Bash(ls*)` auto-approved, `Bash(rm -rf *)` auto-rejected
 
 **2. Hook Layer (Dynamic Analysis)**
-- File: `.claude/hooks/permission-fallback` (Python 3)
+- Provided by: `permission-guard` plugin (`/plugin install permission-guard@skaji18-plugins`)
 - Purpose: Context-aware validation with 8 validation phases
 - Examples: Script containment checks, path verification, subcommand analysis
 
 **3. Subcommand Configuration (Danger Pattern Blocking)**
-- File: `.claude/hooks/permission-config.yaml`
+- File: `.claude/permission-config.yaml`
 - Purpose: Prevent dangerous subcommands even if parent command is in allow list
 - Examples: `git:push`, `gh:pr:merge` → routed to dialog regardless of `git *`/`gh *` allow pattern
 
@@ -978,8 +978,8 @@ claude-crew uses a 3-layer permission control system to balance safety with usab
 | Layer | File | Scope | Example |
 |-------|------|-------|---------|
 | **Static** | `.claude/settings.json` | Glob-based patterns | `allow: ["Bash(ls*)"]`, `deny: ["Bash(rm -rf *)"]` |
-| **Dynamic** | `.claude/hooks/permission-fallback` | Syntax/path/containment checks | Phase 1-7 validation pipeline |
-| **Subcommand** | `.claude/hooks/permission-config.yaml` | Dangerous subcommand blocking | `"git:push"`, `"gh:pr:merge"` |
+| **Dynamic** | `permission-guard` plugin | Syntax/path/containment checks | Phase 1-7 validation pipeline |
+| **Subcommand** | `.claude/permission-config.yaml` | Dangerous subcommand blocking | `"git:push"`, `"gh:pr:merge"` |
 
 ### Phase 7B2: Subcommand Rejection (NEW in v1.0-rc)
 
@@ -989,7 +989,7 @@ claude-crew uses a 3-layer permission control system to balance safety with usab
 - `git clean -f` (data loss)
 - Similar issues with `gh *` pattern
 
-**Solution** (cmd_053): Remove git/gh from allow list → route through hook → Phase 7B2 matches subcommand patterns in `permission-config.yaml`.
+**Solution** (cmd_053): Remove git/gh from allow list → route through hook → Phase 7B2 matches subcommand patterns in `.claude/permission-config.yaml`.
 
 **How It Works**:
 1. User invokes: `git push origin main`
@@ -998,7 +998,7 @@ claude-crew uses a 3-layer permission control system to balance safety with usab
 4. Phase 7B2: Extract subcommand `push` → check `"git:push"` in `subcommand_ask` → REJECT (show dialog)
 5. Result: Dialog shown instead of auto-approval
 
-**Dangerous Patterns Blocked** (from `permission-config.yaml: subcommand_ask`):
+**Dangerous Patterns Blocked** (from `.claude/permission-config.yaml: subcommand_ask`):
 - `git:push` — Any git push operation
 - `git:clean` — Discard tracked files
 - `git:reset:--hard` — Force discard changes
@@ -1015,7 +1015,7 @@ claude-crew uses a 3-layer permission control system to balance safety with usab
 
 ### PermissionRequest Hook Implementation
 
-**File**: `.claude/hooks/permission-fallback` (Python 3 executable)
+**Provided by**: `permission-guard` plugin (`/plugin install permission-guard@skaji18-plugins`)
 
 **Purpose**: Auto-approve project-local script execution and safe general commands while rejecting dangerous operations.
 
@@ -1030,25 +1030,24 @@ claude-crew uses a 3-layer permission control system to balance safety with usab
 | 3 | Command parsing | Split interpreter/script/args | CONTINUE |
 | 4 | Flag normalization | Classify safe vs dangerous flags | CONTINUE |
 | 5 | Path normalization | Lexical canonicalization without filesystem traversal | CONTINUE |
-| 6 | scripts/ and .claude/hooks/ containment | Auto-approve if script in project namespace | ALLOW ✅ |
+| 6 | scripts/ containment | Auto-approve if script in project namespace | ALLOW ✅ |
 | 7 | General command approval | Route to sub-phases 7A-7D | See below |
 
 **Phase 7 (General Command) Sub-phases**:
 - **7A**: Extract command name (e.g., `curl`, `git`, `node`)
 - **7B**: Check ALWAYS_ASK list (`curl`, `sudo`, `npm`, etc.) → REJECT ❌
-- **7B2 (NEW)**: Check `permission-config.yaml: subcommand_ask` patterns → REJECT ❌
+- **7B2 (NEW)**: Check `.claude/permission-config.yaml: subcommand_ask` patterns → REJECT ❌
   - Example: `git push` matches `"git:push"` → show dialog
   - Example: `git status` does NOT match → continue to 7C
 - **7C**: Collect path-like arguments
 - **7D**: Verify all paths contained in project → ALLOW ✅
 
 **Configuration Files**:
-- `.claude/hooks/permission-config.yaml` — Interpreter flags, ALWAYS_ASK list, subcommand_ask patterns
-- `.claude/settings.json` — allow/ask/deny patterns, hook command path
+- `.claude/permission-config.yaml` — Interpreter flags, ALWAYS_ASK list, subcommand_ask patterns (Layer 2: project config)
+- `local/hooks/permission-config.yaml` — Local overlay (Layer 3: user-specific overrides)
+- `.claude/settings.json` — allow/ask/deny patterns
 
-**Testing**: `.claude/hooks/test-permission-fallback.sh` (190+ regression tests)
-
-**Rollback**: Original bash version preserved as `.claude/hooks/permission-fallback.sh.bak`
+**Testing**: `/permission-guard:permission-test` command (190+ regression tests)
 
 ### パーミッション判定フロー
 
@@ -1065,14 +1064,14 @@ Bash tool 呼び出し
     ├── Phases S0-2: シェル構文ガード → 拒否
     │    └─ 失敗 → REJECT ❌
     │
-    ├── Phases 3-6: scripts/ or .claude/hooks/ 含義判定
+    ├── Phases 3-6: scripts/ 含義判定
     │    └─ プロジェクト内スクリプト → ALLOW ✅
     │
     └── Phase 7: 汎用コマンド承認
         ├── 7A: コマンド名抽出
         ├── 7B: ALWAYS_ASK リスト一致 → REJECT ❌
         │    (curl, sudo, npm, node 等)
-        ├── 7B2: サブコマンド拒否パターン → REJECT ❌
+        ├── 7B2: サブコマンド拒否パターン (.claude/permission-config.yaml) → REJECT ❌
         │    (git push, gh pr merge 等)
         ├── 7C: パス引数収集
         └── 7D: パス引数がプロジェクト内 → ALLOW ✅
@@ -1096,9 +1095,9 @@ deny > allow > hook > ask > default の優先順位で判定される。hookは 
 | GitHub CLI 危険操作（pr merge, repo delete, repo archive） | 毎回確認（hook Phase 7B2 経由で subcommand_ask 拒否） |
 | Git 安全操作（status, log, diff, add, commit） | 自動許可（hook Phase 7D 経由） |
 | GitHub CLI 安全操作（pr view, issue list） | 自動許可（hook Phase 7D 経由） |
-| スクリプト実行（scripts/ 配下・.claude/hooks/ 配下） | hook Phase 6 経由で自動許可（詳細は `.claude/hooks/permission-fallback` 参照） |
+| スクリプト実行（scripts/ 配下） | hook Phase 6 経由で自動許可（詳細は `permission-guard` plugin 参照） |
 | 汎用コマンド（プロジェクト内パス）（find, cat, wc, stat, tree 等） | hook Phase 7 経由で自動許可（パス封じ込め確認） |
-| ALWAYS_ASK（ネットワーク・権限昇格・インタプリタ） | 毎回確認（curl, sudo, npm, node 等。詳細は `permission-config.yaml: always_ask` 参照） |
+| ALWAYS_ASK（ネットワーク・権限昇格・インタプリタ） | 毎回確認（curl, sudo, npm, node 等。詳細は `.claude/permission-config.yaml: always_ask` 参照） |
 | ファイル操作ツール（Read, Glob, Grep） | 自動許可（allow リスト） |
 | ファイル書き込み（Edit, Write） | 自動許可（allow リスト） |
 | HTTP DELETE（curl -X DELETE） | 自動拒否（deny リスト） |

@@ -27,7 +27,7 @@ These items were completed during Rounds 1-10 (cmd_081→089) and are now operat
 | **Execution log validation** | DONE | `scripts/validate_exec_log.py`, E100-E199 error range |
 | **Background execution deprecation** | DONE | Removed in cmd_089 (2026-02-15). Foreground-only execution now mandatory. |
 | **Persona system (custom roles)** | DONE | `templates/worker_*.md`, `personas/` directory, custom persona support |
-| **Permission hooks** | DONE | `local/hooks/permission-config.yaml`, runtime permission control |
+| **Permission hooks** | DONE | Migrated to `permission-guard` plugin (`/plugin install permission-guard@skaji18-plugins`). Project config: `.claude/permission-config.yaml`. Local overlay: `local/hooks/permission-config.yaml`. |
 | **Config merge (local overrides)** | DONE | `scripts/merge_config.py`, `local/config.yaml` support |
 | **Health check diagnostics** | DONE | `scripts/health_check.sh` |
 
@@ -70,7 +70,7 @@ Items not yet started, grouped by domain. Total effort: **58.5-63.5h** (realisti
 | # | Item | Priority | Effort | Notes | Completion Criteria |
 |---|------|----------|--------|-------|---------------------|
 | 6 | Config merge documentation | B | 1.5h | **REVERTED from v7.2 merge**. Document local/config.yaml override behavior + examples. | `docs/config.md` section explaining merge precedence, 2+ examples of override patterns |
-| 7 | Permission hooks guide | B | 2.5h | **REVERTED from v7.2 merge**. Document permission-config.yaml usage + real-world examples. | `docs/permission_hooks.md` with 3+ complete use cases (file blocking, approval flows, etc.) |
+| 7 | Permission hooks guide | B | 2.5h | **REVERTED from v7.2 merge**. Document `permission-guard` plugin usage + `.claude/permission-config.yaml` configuration + real-world examples. | `docs/permission_hooks.md` with 3+ complete use cases (file blocking, approval flows, etc.) |
 | 8 | Error message inline troubleshooting | S | 4-5h | **REVISED from 3h** (feasibility: error analysis + fix drafting + testing 10 scenarios). Embed fix suggestions in error output. | Error messages include "Try: [action]" hints for top 10 errors (E001-E010) |
 | 9 | Hierarchical aggregation (40+ tasks) | A | 8-9h | **REVISED from 7h** (feasibility: performance debugging for 40+ task aggregation). Support decomposition into 40+ subtasks. | Aggregator handles 40+ result files without OOM or timeout, tested with synthetic 50-task cmd |
 | 10 | Multi-round framework documentation | S | 2h | Document Rounds 1-N convergence pattern. **BLOCKING** for Round 11+ meta-design work. Elevated from A to S (review feedback #7). | `docs/multi_round.md` explaining when to use, how to structure, termination criteria |

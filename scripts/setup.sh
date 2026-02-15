@@ -140,7 +140,6 @@ fi
 FIXED=0
 for f in "$PROJECT_ROOT"/scripts/*.sh "$PROJECT_ROOT"/scripts/*.py \
          "$PROJECT_ROOT"/.claude/hooks/*.sh "$PROJECT_ROOT"/.claude/hooks/*.py \
-         "$PROJECT_ROOT"/.claude/hooks/permission-fallback \
          "$PROJECT_ROOT"/.claude/skills/*/scripts/*.sh "$PROJECT_ROOT"/.claude/skills/*/scripts/*.py; do
   [[ -e "$f" ]] || continue
   if [[ ! -x "$f" ]]; then
@@ -156,7 +155,17 @@ else
 fi
 
 # =========================================================
-# 6. Memory MCP  (check only — optional)
+# 6. permission-guard plugin  (check only)
+# =========================================================
+if [[ -f "$PROJECT_ROOT/.claude/settings.json" ]] && \
+   jq -e '.enabledPlugins["permission-guard@skaji18-plugins"]' "$PROJECT_ROOT/.claude/settings.json" >/dev/null 2>&1; then
+  echo "✓ permission-guard plugin enabled"
+else
+  echo "⚠ permission-guard plugin not enabled in .claude/settings.json"
+fi
+
+# =========================================================
+# 7. Memory MCP  (check only — optional)
 # =========================================================
 if command -v claude >/dev/null 2>&1; then
   if claude mcp list 2>/dev/null | grep -q "memory:.*✓ Connected"; then
@@ -169,7 +178,7 @@ else
 fi
 
 # =========================================================
-# 7. Validation
+# 8. Validation
 # =========================================================
 if [[ $ERRORS -gt 0 ]]; then
   echo

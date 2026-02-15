@@ -74,17 +74,14 @@ else
   check "settings.json not found" "fail"
 fi
 
-# Check 4: permission-fallback hook is executable
-# Supports both permission-fallback (Python) and permission-fallback.sh (legacy)
-if [[ -x "$PROJECT_ROOT/.claude/hooks/permission-fallback" ]]; then
-  echo "[4/10] permission-fallback is executable ... PASS"
-  check "permission-fallback" "pass"
-elif [[ -x "$PROJECT_ROOT/.claude/hooks/permission-fallback.sh" ]]; then
-  echo "[4/10] permission-fallback.sh is executable ... PASS"
-  check "permission-fallback.sh" "pass"
+# Check 4: permission-guard plugin is enabled
+if [[ -f "$PROJECT_ROOT/.claude/settings.json" ]] && \
+   jq -e '.enabledPlugins["permission-guard@skaji18-plugins"]' "$PROJECT_ROOT/.claude/settings.json" >/dev/null 2>&1; then
+  echo "[4/10] permission-guard plugin enabled ... PASS"
+  check "permission-guard plugin" "pass"
 else
-  echo "[4/10] permission-fallback hook is executable ... FAIL"
-  check "permission-fallback hook not executable or missing" "fail"
+  echo "[4/10] permission-guard plugin enabled ... FAIL"
+  check "permission-guard plugin not enabled in .claude/settings.json" "fail"
 fi
 
 # Check 5: jq is installed
@@ -135,18 +132,13 @@ else
   check "scripts/ directory not found" "fail"
 fi
 
-# Check 7: Hook test suite passes
-if [[ -f "$PROJECT_ROOT/.claude/hooks/test-permission-fallback.sh" ]]; then
-  if bash "$PROJECT_ROOT/.claude/hooks/test-permission-fallback.sh" >/dev/null 2>&1; then
-    echo "[7/10] Hook test suite passes ... PASS"
-    check "hook tests" "pass"
-  else
-    echo "[7/10] Hook test suite passes ... FAIL"
-    check "test-permission-fallback.sh failed" "fail"
-  fi
+# Check 7: permission-config.yaml exists
+if [[ -f "$PROJECT_ROOT/.claude/permission-config.yaml" ]]; then
+  echo "[7/10] permission-config.yaml exists ... PASS"
+  check "permission-config.yaml" "pass"
 else
-  echo "[7/10] Hook test suite passes ... FAIL"
-  check "test-permission-fallback.sh not found" "fail"
+  echo "[7/10] permission-config.yaml exists ... WARN"
+  check "permission-config.yaml not found (plugin uses defaults)" "warn"
 fi
 
 # Check 8: CLAUDE.md exists
