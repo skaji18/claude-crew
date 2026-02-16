@@ -9,6 +9,8 @@
 
 ### 共通パターン: Secretary Delegation
 
+> **⚠️ DEPRECATED (2026-02-17)**: Secretary Pattern は8ラウンド調査 (cmd_119-126, cmd_113) の結果、無効化された。`config.yaml: secretary.enabled` はデフォルト `false`。以下のフローは `enabled: true` に設定した場合のみ適用される。詳細: `work/cmd_126/report.md`
+
 全Phase（B/C/D）共通の委譲パターン。各Phase冒頭でこのパターンを適用する。
 
 > **v2 移行注記**: v2 では `delegate_phases` および `min_tasks_for_delegation` は使用しない。既存 config にこれらのフィールドが存在しても v2 の親ロジックでは無視される。

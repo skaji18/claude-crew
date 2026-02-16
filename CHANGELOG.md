@@ -7,6 +7,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Changed
+- **Secretary Pattern deprecated** — Disabled by default (`secretary.enabled: false`) based on 8-round investigation (cmd_119-126, cmd_113); deprecation notices added to config.yaml, parent_guide.md, secretary.md, CLAUDE.md; path-passing rationale updated from capacity conservation to attention quality preservation; dormant fields preserved for measurement-triggered reactivation
 - **parent_guide.md flow control restructure** — Promoted Secretary Delegation pattern from Phase 2 subsection to top-level `### 共通パターン` section; extracted LP operational details (260+ lines) to dedicated `## LP System Operations` section; unified heading levels across Phases; added Secretary to overview.md architecture diagram and CLAUDE.md Template Reference
 
 ### Added

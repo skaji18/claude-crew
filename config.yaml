@@ -70,16 +70,18 @@ lp_system:
                                  # Examples: ["TypeScript", "React", "Node.js"]
                                  # Used for auto-inferring LP scope
 
-# Secretary Pattern — delegates Phase operations to haiku sub-agent
-# When enabled, ALL Phase operations (B/C/D) are delegated. Secretary autonomously
-# decides whether to execute or skip each operation based on context.
-# Migration note: v1 fields (delegate_phases, min_tasks_for_delegation) are no longer used.
-# If present in local/config.yaml, they will be silently ignored by v2 parent logic.
+# Secretary Pattern — delegates Phase operations to sub-agent (DEPRECATED)
+# Disabled based on 8-round investigation (cmd_119-126, cmd_113).
+# Rationale: 85-90% confidence for removal. Measured harms (14-39% info loss,
+# 165-270s latency, 960 lines complexity) exceed unmeasured benefits.
+# 15/15 technology scenarios predict obsolescence (R6, adjusted to 12-13/15 per R7).
+# Dormant fields preserved for potential measurement-triggered reactivation.
+# Full analysis: work/cmd_126/report.md
 secretary:
-  enabled: true                    # true = delegate all phases; false = traditional flow
-  model: haiku
-  max_turns: 10
-  fallback_on_failure: true        # If secretary fails or skips, parent falls back to direct execution
+  enabled: false                   # DEPRECATED. Set true only if empirical measurement justifies reactivation
+  model: haiku                     # (dormant)
+  max_turns: 10                    # (dormant)
+  fallback_on_failure: true        # (dormant)
 
 # Phase-specific custom instructions (optional)
 # Appended to phase prompts when non-empty

@@ -36,7 +36,7 @@ Conventional Commits for approved improvements (see `docs/parent_guide.md`).
 | Writer | `templates/worker_writer.md` | Documentation & content |
 | Coder | `templates/worker_coder.md` | Code implementation |
 | Reviewer | `templates/worker_reviewer.md` | Review & quality check |
-| Secretary | `templates/secretary.md` | Phase operation delegation |
+| Secretary | `templates/secretary.md` | Phase operation delegation (disabled by default) |
 | Custom | `personas/*.md` | User-defined personas |
 | Aggregator | `templates/aggregator.md` | Result integration |
 | Retrospector | `templates/retrospector.md` | Post-mortem analysis |
@@ -59,4 +59,5 @@ Full LP rules: `docs/lp_rules.md`
 ## Context Management
 
 Parent is path-passing only. Do not read task/result content.
+Rationale: attention quality preservation (MRCR v2: 93% retrieval at 256K → 76% at 1M), not capacity conservation.
 Foreground parallel execution only. Do not use `run_in_background: true` (background Task has known bugs: MCP unavailable, output_file 0-byte, notification failures).
