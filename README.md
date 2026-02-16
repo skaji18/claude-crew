@@ -85,12 +85,10 @@ claude-crew/
 │   └── multi_analysis.md      # N-viewpoint parallel analysis framework
 ├── personas/                  # Custom worker persona definitions (optional)
 ├── scripts/
-│   ├── analyze_patterns.sh    # Extract workflow patterns from execution logs
 │   ├── health_check.sh        # Basic file structure validation
 │   ├── new_cmd.sh             # Atomic cmd directory creation
 │   ├── setup.sh               # Prerequisites check + Memory MCP connection test
 │   ├── smoke_test.sh          # End-to-end infrastructure test
-│   ├── stats.sh               # Parse execution logs for success rates
 │   ├── validate_config.sh     # Validate config.yaml fields and types
 │   ├── validate_lp.py         # LP entity format validation
 │   ├── validate_result.sh     # Result file validation (JSON output)
@@ -212,9 +210,7 @@ The framework includes utility scripts for validation, testing, and analysis:
 | `smoke_test.sh` | End-to-end infrastructure test | `bash scripts/smoke_test.sh` |
 | `validate_config.sh` | Validate config.yaml fields and types | `bash scripts/validate_config.sh` |
 | `validate_result.sh` | Validate result file metadata and completeness | `bash scripts/validate_result.sh <result_path> <persona>` |
-| `stats.sh` | Parse execution logs for success rates and durations | `bash scripts/stats.sh [work_dir]` |
 | `visualize_plan.sh` | Generate Mermaid diagram from plan.md | `bash scripts/visualize_plan.sh [plan_path]` |
-| `analyze_patterns.sh` | Extract workflow patterns from execution logs | `bash scripts/analyze_patterns.sh [output_path]` |
 | `new_cmd.sh` | Create new cmd directory atomically | `bash scripts/new_cmd.sh` |
 | `health_check.sh` | Basic file structure validation | `bash scripts/health_check.sh` |
 | `validate_lp.py` | LP entity format validation | `python3 scripts/validate_lp.py --help` |

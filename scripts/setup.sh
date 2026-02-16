@@ -70,7 +70,7 @@ confirm() {
 if [[ ${BASH_VERSINFO[0]:-0} -ge 4 ]]; then
   echo "✓ Bash ${BASH_VERSINFO[0]}"
 else
-  echo "⚠ Bash ${BASH_VERSINFO[0]:-unknown} — some utility scripts (stats.sh, analyze_patterns.sh) require Bash 4+"
+  echo "⚠ Bash ${BASH_VERSINFO[0]:-unknown} — some utility scripts require Bash 4+"
 fi
 
 # =========================================================

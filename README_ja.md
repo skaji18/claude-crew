@@ -82,9 +82,7 @@ claude-crew/
 │   ├── smoke_test.sh          # エンドツーエンドインフラテスト
 │   ├── validate_config.sh     # config.yamlのフィールド・型検証
 │   ├── validate_result.sh     # 結果ファイルのメタデータ・完全性検証
-│   ├── stats.sh               # 実行ログから成功率・実行時間を解析
 │   ├── visualize_plan.sh      # plan.mdからMermaid図を生成
-│   ├── analyze_patterns.sh    # 実行ログからワークフローパターンを抽出
 │   ├── new_cmd.sh             # Atomic cmd directory creation
 │   ├── validate_lp.py         # LP エンティティのフォーマット検証
 │   └── health_check.sh        # 基本的なファイル構造検証
@@ -203,9 +201,7 @@ work/
 | `smoke_test.sh` | エンドツーエンドインフラテスト | `bash scripts/smoke_test.sh` |
 | `validate_config.sh` | config.yamlのフィールド・型検証 | `bash scripts/validate_config.sh` |
 | `validate_result.sh` | 結果ファイルのメタデータ・完全性検証 | `bash scripts/validate_result.sh <result_path> <persona>` |
-| `stats.sh` | 実行ログから成功率・実行時間を解析 | `bash scripts/stats.sh [work_dir]` |
 | `visualize_plan.sh` | plan.mdからMermaid図を生成 | `bash scripts/visualize_plan.sh [plan_path]` |
-| `analyze_patterns.sh` | 実行ログからワークフローパターンを抽出 | `bash scripts/analyze_patterns.sh [output_path]` |
 | `new_cmd.sh` | 新規cmdディレクトリをアトミックに作成 | `bash scripts/new_cmd.sh` |
 | `health_check.sh` | 基本的なファイル構造検証 | `bash scripts/health_check.sh` |
 | `validate_lp.py` | LPエンティティのフォーマット検証 | `python3 scripts/validate_lp.py --help` |

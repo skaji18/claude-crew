@@ -55,23 +55,6 @@ After searching Memory MCP, if `antipattern:*` entities are found, apply them du
 
 **Principle**: Anti-patterns are lessons learned. Apply them proactively, but do not over-engineer defenses for unrelated patterns.
 
-### Historical Patterns (W4)
-
-If `patterns.md` exists in the project root, read it before decomposing tasks:
-
-1. Review success rates by persona and model
-2. Check recommended wave sizes and task sequences
-3. Apply recommendations when planning:
-   - Prefer persona+model combinations with high success rates
-   - Use tested task sequences when applicable
-   - Consider wave sizing recommendations
-
-**Conflict Resolution**: If patterns.md recommendations conflict with anti-patterns (W2), anti-patterns take priority. A specific documented failure is stronger evidence than aggregate statistics.
-
-**Example**: If patterns.md says "3 parallel coders works 80% of the time" but `antipattern:dependency:parallel-file-conflict` exists for this codebase, avoid parallel coder tasks on overlapping files.
-
-**Important**: patterns.md is supplementary guidance, not strict rules. Task-specific requirements always take precedence.
-
 ## Mutation Keyword Detection (Layer 1)
 
 After searching Memory MCP, scan the request file for mutation keywords that indicate the user wants deeper critical analysis beyond Layer 0 (Self-Challenge Prompt). When detected, inject strategy-specific instructions into task files.
@@ -222,7 +205,7 @@ cmd_id: "cmd_NNN"                       # command ID (required)
 [Specific instructions, constraints, acceptance criteria]
 ```
 
-### wave_plan.json (W4)
+### wave_plan.json
 
 After writing plan.md and all task files, generate an additional structured JSON file (`wave_plan.json`) containing dependency graph metadata. This enables the parent to construct wave execution order from lightweight JSON instead of parsing the full markdown plan.
 

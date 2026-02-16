@@ -116,7 +116,7 @@ ELSE:
    - prompt に TEMPLATE_PATH + 上記3パスを明記する（テンプレートの内容は含めない）
 4. 結果: `work/cmd_xxx/plan.md` にタスク分解結果が書かれる
    - 各サブタスクが `work/cmd_xxx/tasks/task_N.md` として生成される
-   - **Phase A 最適化（W4）**: decomposer は `work/cmd_xxx/wave_plan.json` も生成する
+   - **Phase A 最適化**: decomposer は `work/cmd_xxx/wave_plan.json` も生成する
      - 存在する場合、Phase 2 で wave_plan.json を使用してWave構築効率を向上
      - 存在しない場合、従来通り plan.md を解析してWaveを構築（後方互換性）
 
@@ -219,41 +219,14 @@ secretary.enabled が false または delegation に失敗した場合（フォ�
    - **Wave割り当ては `Depends On` 列のみから計算せよ。plan.md の `## Execution Order` セクションは参照用であり、Wave割り当ての正データではない。** `Execution Order` と `Depends On` 列が矛盾する場合（例: `Depends On: -` のタスクがWave 2以降に配置されている場合）、`Depends On` 列を正とし、そのタスクをWave 1に含める。
 
 4. **Wave を並列実行する**:
-   - **進捗メッセージ**: Wave 実行開始時にユーザーに通知する（ETA付き）
-     - 例: `Wave 1/3: 3 tasks running (~2 min est.)`
-     - ETA が算出不可の場合: `Wave 1/3: 3 tasks running`
+   - **進捗メッセージ**: Wave 実行開始時にユーザーに通知する
+     - 例: `Wave 1/3: 3 tasks running`
    - 各タスクに対して実働サブエージェントを起動する:
      - テンプレートパス（TEMPLATE_PATH）: `templates/worker_xxx.md` からタスクに適したものを選択
      - 入力パス: `work/cmd_xxx/tasks/task_N.md`
      - 出力パス: `work/cmd_xxx/results/result_N.md`
      - prompt に TEMPLATE_PATH + 入出力パスを含める（テンプレートの内容は含めない）
    - **独立したタスクは1メッセージ内で複数の Task tool 呼び出しを行い並列実行する**
-
-   #### Wave進捗メッセージの ETA 計算
-
-   Wave の推定所要時間を算出する方法:
-
-   1. **stats.sh データが利用可能な場合**（10+ 実行ログ）:
-      - `bash scripts/stats.sh` を実行し、ペルソナ別の平均実行時間を抽出
-      - 現在の Wave に属する各タスクについて、そのペルソナの平均時間を合計
-      - 合計を `config.yaml: max_parallel` で除算し、Wave の推定所要時間を算出
-
-   2. **データ不足の場合**（<10 ログ）:
-      - フォールバック推定値を使用:
-        - researcher: 60秒
-        - writer: 90秒
-        - coder: 120秒
-        - reviewer: 45秒
-      - 各タスクのペルソナで推定値を合計
-      - 合計を `max_parallel` で除算
-
-   3. **人間が読みやすい形式に丸める**:
-      - < 90秒: "~1 min"
-      - 90-150秒: "~2 min"
-      - > 150秒: "~N min" (最も近い分に四捨五入)
-
-   **エッジケース**:
-   - ETA が算出不可（stats データなし、フォールバック不可）: ETA 句を省略、Wave メッセージのみ
 
 5. **Wave 完了確認 → 次の Wave へ進む**:
    a. 現在の Wave の全タスクが完了したら、`results/` 内の result_N.md 存在をチェック
@@ -262,7 +235,7 @@ secretary.enabled が false または delegation に失敗した場合（フォ�
       - JSON結果の `status` が `"pass"` + `issues` あり → execution_log.yaml の `metadata_issues` に記録
       - JSON結果の `status` が `"pass"` + `issues` なし → 完了
 
-   c. **Phase A 最適化（W4）: JSON メタデータフィールドで判定（result ファイル読み込み最小化）**:
+   c. **Phase A 最適化: JSON メタデータフィールドで判定（result ファイル読み込み最小化）**:
       - `validate_result.sh` の JSON 出力に以下の新しいフィールドが含まれている:
         - `result_status`: result ファイルの YAML frontmatter から抽出された status フィールド
         - `result_quality`: result ファイルの YAML frontmatter から抽出された quality フィールド
