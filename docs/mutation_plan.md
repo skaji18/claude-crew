@@ -177,9 +177,16 @@ Layer 2B: /mutate Skill ─────────── オンデマンド、�
 
 ### Phase 3: Layer 1 Deploy (Week 4, conditional)
 
-- [ ] `templates/decomposer.md` — Mutation Keyword Detectionセクション追加
+- [x] `templates/decomposer.md` — Mutation Keyword Detectionセクション追加 (cmd_129, 2026-02-17)
 - [ ] キーワード付きrequest 2件でテスト
 - [ ] ワーカー出力にLayer 0 + Layer 1セクションが含まれることを確認
+
+**Deployment Notes (cmd_129)**:
+- Section inserted between "Pre-Decomposition: Memory MCP Search" and "Output" sections (lines 75-166)
+- 4 strategies implemented: `assumption_reversal`, `adversarial_review`, `alternative_exploration`, `comprehensive_mutation`
+- Case-insensitive keyword detection with English and Japanese keyword equivalents
+- Injection target: task_N.md Details section → `## Mutation Instructions` subsection
+- Layer 1 operates complementarily to Layer 0 Self-Challenge Prompt (both applied to selected tasks)
 
 **判定**: keyword adoption ≥30%, mutation value ≥60% → STOP
 

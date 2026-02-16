@@ -72,6 +72,98 @@ If `patterns.md` exists in the project root, read it before decomposing tasks:
 
 **Important**: patterns.md is supplementary guidance, not strict rules. Task-specific requirements always take precedence.
 
+## Mutation Keyword Detection (Layer 1)
+
+After searching Memory MCP, scan the request file for mutation keywords that indicate the user wants deeper critical analysis beyond Layer 0 (Self-Challenge Prompt). When detected, inject strategy-specific instructions into task files.
+
+### Relationship to Layer 0
+
+Layer 1 is complementary to Layer 0 (Self-Challenge Prompt in `config.yaml: phase_instructions.execute`). Tasks with mutation keywords receive BOTH:
+- **Layer 0**: Baseline Self-Challenge (always applied, 2 failure scenarios minimum)
+- **Layer 1**: Strategy-specific mutation instructions (conditional on keyword detection)
+
+Layer 0 is mandatory for all tasks. Layer 1 is an additional mutation layer applied only when keywords are detected.
+
+### Keyword Detection Table
+
+Scan the request file for the following keywords (case-insensitive, supports English and Japanese):
+
+| Keyword | Japanese Equivalent | Strategy | Worker Instruction |
+|---------|---------------------|----------|-------------------|
+| "challenge assumptions" | 「前提に疑問」 | assumption_reversal | 3-5の前提を特定し、各々FALSEである理由を論証 |
+| "find flaws" / "red team" | 「欠陥を見つけ」 | adversarial_review | 5つの失敗モードをリスト化、リスク順にランク付け |
+| "explore alternatives" | 「代替案を探る」 | alternative_exploration | ベースラインと矛盾する3つの代替案を提案、トレードオフ比較 |
+| "critical challenges" | 「批判的に挑戦」 | comprehensive_mutation | 上記3戦略すべてを適用 |
+
+### Detection Logic
+
+1. Read the request file content
+2. Convert to lowercase for case-insensitive matching
+3. Check for each keyword (English and Japanese variants)
+4. Multiple keywords can be detected per request
+5. If no keywords detected, skip mutation injection (Layer 0 still applies)
+
+### Implementation Instructions
+
+When mutation keywords are detected:
+
+1. **Identify affected tasks**: Determine which tasks should receive mutation instructions (typically researcher, coder, or reviewer tasks requiring critical analysis)
+
+2. **Inject mutation instructions**: Add a `## Mutation Instructions` subsection to each affected task's Details section
+
+   **Format**:
+   ```markdown
+   ## Mutation Instructions
+
+   Strategy: [strategy_name]
+
+   [worker_instruction_from_table]
+   ```
+
+   **Example**:
+   ```markdown
+   ## Mutation Instructions
+
+   Strategy: assumption_reversal
+
+   3-5の前提を特定し、各々FALSEである理由を論証。
+   ```
+
+3. **Handle multiple strategies**: If multiple keywords are detected, apply the most comprehensive strategy to each task, or apply multiple strategies if appropriate
+
+4. **Preserve Layer 0**: Mutation instructions are in addition to, not replacing, the Self-Challenge Prompt from Layer 0
+
+### Recording in plan.md
+
+When mutation keywords are detected, add a `## Mutation Layer 1` section after `## Execution Order`:
+
+**Format**:
+```markdown
+## Mutation Layer 1
+
+Detected keywords: "[keyword1]", "[keyword2]"
+Applied strategies: [strategy1], [strategy2]
+Affected tasks: [task numbers] ([personas])
+```
+
+**Example**:
+```markdown
+## Mutation Layer 1
+
+Detected keywords: "challenge assumptions", "explore alternatives"
+Applied strategies: assumption_reversal, alternative_exploration
+Affected tasks: 1, 3, 5 (researcher, coder)
+```
+
+If no keywords are detected, omit this section entirely.
+
+### Integration Notes
+
+- This section does not modify existing decomposition rules or output requirements
+- YAML frontmatter, Self-Check, and all existing sections remain unchanged
+- Mutation instructions are added to tasks transparently without breaking the task template structure
+- Workers will see mutation instructions in their task Details and apply them in addition to their standard role requirements
+
 ## Output
 
 Write the following files (paths are provided by the parent as `PLAN_PATH` and `TASKS_DIR`):
